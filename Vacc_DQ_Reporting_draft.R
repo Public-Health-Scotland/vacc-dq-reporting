@@ -73,23 +73,23 @@ start.time <- Sys.time()
 
 ### LOAD PACKAGES TO LIBRARIES
 library(dplyr)
-library(stringr)
-library(tidyverse)
-library(tidyr)
-library(magrittr)
-library(writexl)
-library(openxlsx)
-library(lubridate)
-library(janitor)
-library(textclean)
-library(keyring)
-library(odbc)
-library(phsmethods)
+# library(stringr)
+# library(tidyverse)
+# library(tidyr)
+# library(magrittr)
+# library(writexl)
+# library(openxlsx)
+# library(lubridate)
+# library(janitor)
+# library(textclean)
+# library(keyring)
+# library(odbc)
+# library(phsmethods)
 library(readxl)
-library(svDialogs)
+# library(svDialogs)
 
 ### ESTABLISH ODBC CONNECTION TO DVPROD MANUALLY
-conn <- dbConnect(odbc::odbc(),
+conn <- odbc::dbConnect(odbc::odbc(),
                   dsn = "DVPROD", 
                   uid = paste(Sys.info()['user']),
                   pwd = .rs.askForPassword("password"))
@@ -171,7 +171,7 @@ sheet0$summary_date <- Sys.Date() # Adds date the summary is run
 sheet0$diff_since_last_run <- as.numeric(0) # Adds blank column for later weekly difference calculation
 sheet0 <- sheet0 %>% select(summary_date,everything()) # Reorders columns
 
-vdl_summ <- file.path("//PHI_conf/VaccineDM/VDL_summary.xlsx")
+vdl_summ <- file.path("VDL_summary.xlsx")
 
 # Read in previous week's figures
 sheet1 <- read_excel(vdl_summ, 
@@ -223,21 +223,21 @@ SystemSummaryFull <-
 options(openxlsx.dateFormat = "yyyy-mm-dd")
 
 # Overwrite summary Excel file with latest 8 weeks
-write.xlsx(SystemSummaryFull,
-           paste("//PHI_conf/VaccineDM/VDL_summary.xlsx"),
+openxlsx::write.xlsx(SystemSummaryFull,
+           paste("VDL_summary.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
 
 # save backup of workbook every month
-if (day(Sys.Date()) < 8) {
-write.xlsx(SystemSummaryFull,
-           paste("//PHI_conf/VaccineDM/Archive/VDL_summary_backup.xlsx"),
+if (lubridate::day(Sys.Date()) < 8) {
+  openxlsx::write.xlsx(SystemSummaryFull,
+           paste("Archive/VDL_summary_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto") }
 
 # Save previous run's figures as backup
-write.xlsx(sheet1,
-           paste("//PHI_conf/VaccineDM/Archive/VDL_summary_sheet1_backup.xlsx"),
+openxlsx::write.xlsx(sheet1,
+           paste("Archive/VDL_summary_sheet1_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
 
