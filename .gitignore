@@ -2,4 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-.xlsx
+
+# Excel files
+*.[xX][lL][sS]*
+*.[xX][lL][sS][xX]*
