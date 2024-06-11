@@ -823,7 +823,7 @@ gc()
 #############################################################################################
 
 ### EXTRACT VARIABLES FROM COMPLETED FLU VACC RECORDS IN vaccination_event_analysis VIEW
-FluVaxData <- dbGetQuery(conn, "select 
+FluVaxData <- odbc::dbGetQuery(conn, "select 
                         source_system_patient_id,
                         patient_derived_encrypted_upi,
                         vacc_source_system_event_id, 
@@ -850,8 +850,8 @@ FluVaxData <- dbGetQuery(conn, "select
                          params = reporting_start_date-28)
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
-FluVaxData$vacc_location_name <- replace_non_ascii(FluVaxData$vacc_location_name,replacement = "")
-FluVaxData$vacc_performer_name <- replace_non_ascii(FluVaxData$vacc_performer_name,replacement = "")
+FluVaxData$vacc_location_name <- textclean::replace_non_ascii(FluVaxData$vacc_location_name,replacement = "")
+FluVaxData$vacc_performer_name <- textclean::replace_non_ascii(FluVaxData$vacc_performer_name,replacement = "")
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 FluVaxData$vacc_record_date <- as.Date(substr(FluVaxData$vacc_record_created_at,1,10))
@@ -883,7 +883,7 @@ FluVaxData <- FluVaxData %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
-  mutate(CHIcheck = chi_check(patient_derived_chi_number)) # create CHI check data item
+  mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
 ### CREATE FLU VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -965,12 +965,12 @@ rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_naSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  write.xlsx(flu_SummaryReport,
+  openxlsx::write.xlsx(flu_SummaryReport,
            paste("//PHI_conf/VaccineDM/DQ Summary Reports/Flu_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  write.xlsx(flu_SummaryReport,
+  openxlsx::write.xlsx(flu_SummaryReport,
              paste("//PHI_conf/VaccineDM/DQ Summary Reports/Flu_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
