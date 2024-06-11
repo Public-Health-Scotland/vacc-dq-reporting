@@ -966,12 +966,12 @@ rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_naSumm,
 #Saves out collated tables into an excel file
 if (answer==1) {
   openxlsx::write.xlsx(flu_SummaryReport,
-           paste("//PHI_conf/VaccineDM/DQ Summary Reports/Flu_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+           paste("DQ Summary Reports/Flu_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
   openxlsx::write.xlsx(flu_SummaryReport,
-             paste("//PHI_conf/VaccineDM/DQ Summary Reports/Flu_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+             paste("DQ Summary Reports/Flu_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
   }
@@ -1357,12 +1357,12 @@ rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_naSumm,
 #Saves out collated tables into an excel file
 if (answer==1) {
   openxlsx::write.xlsx(HZSummaryReport,
-             paste("//PHI_conf/VaccineDM/DQ Summary Reports/Shingles_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+             paste("DQ Summary Reports/Shingles_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
   } else {
     openxlsx::write.xlsx(HZSummaryReport,
-            paste("//PHI_conf/VaccineDM/DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+            paste("DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
             asTable = TRUE,
             colWidths = "auto")
   }
