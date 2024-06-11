@@ -252,7 +252,7 @@ gc()
 ########################################################################
 
 ### EXTRACT VARIABLES IN vaccination_patient_analysis VIEW
-Vaxpatientraw <- dbGetQuery(conn, "select 
+Vaxpatientraw <- odbc::dbGetQuery(conn, "select 
                             source_system_patient_id,
                             patient_derived_chi_number,
                             patient_derived_upi_number,
@@ -269,8 +269,8 @@ Vaxpatientraw <- dbGetQuery(conn, "select
                             from vaccination.vaccination_patient_analysis ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN PATIENT ANALYSIS DATA
-Vaxpatientraw$patient_family_name <- replace_non_ascii(Vaxpatientraw$patient_family_name,replacement = "")
-Vaxpatientraw$patient_given_name <- replace_non_ascii(Vaxpatientraw$patient_given_name,replacement = "")
+Vaxpatientraw$patient_family_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_family_name,replacement = "")
+Vaxpatientraw$patient_given_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_given_name,replacement = "")
 
 
 ########################################################################
@@ -282,7 +282,7 @@ Vaxpatientraw$patient_given_name <- replace_non_ascii(Vaxpatientraw$patient_give
 #############################################################################################
 
 ### EXTRACT COMPLETED COVID-19 VACC RECORDS IN vaccination_event_analysis VIEW
-CovVaxData <- dbGetQuery(conn, "select 
+CovVaxData <- odbc::dbGetQuery(conn, "select 
                         source_system_patient_id,
                         patient_derived_encrypted_upi,
                         vacc_source_system_event_id, 
@@ -307,8 +307,8 @@ CovVaxData <- dbGetQuery(conn, "select
                           AND vacc_clinical_trial_flag='0' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
-CovVaxData$vacc_location_name <- replace_non_ascii(CovVaxData$vacc_location_name,replacement = "")
-CovVaxData$vacc_performer_name <- replace_non_ascii(CovVaxData$vacc_performer_name,replacement = "")
+CovVaxData$vacc_location_name <- textclean::replace_non_ascii(CovVaxData$vacc_location_name,replacement = "")
+CovVaxData$vacc_performer_name <- textclean::replace_non_ascii(CovVaxData$vacc_performer_name,replacement = "")
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 CovVaxData$vacc_record_date <- as.Date(substr(CovVaxData$vacc_record_created_at,1,10))
@@ -340,7 +340,7 @@ CovVaxData <- CovVaxData %>%
   inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
-  mutate(CHIcheck = chi_check(patient_derived_chi_number)) # create CHI check data item
+  mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -788,13 +788,13 @@ rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  write.xlsx(cov_SummaryReport,
-           paste("//PHI_conf/VaccineDM/DQ Summary Reports/Covid-19_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+  openxlsx::write.xlsx(cov_SummaryReport,
+           paste("DQ Summary Reports/Covid-19_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  write.xlsx(cov_SummaryReport,
-             paste("//PHI_conf/VaccineDM/DQ Summary Reports/Covid-19_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+  openxlsx::write.xlsx(cov_SummaryReport,
+             paste("DQ Summary Reports/Covid-19_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
   }
