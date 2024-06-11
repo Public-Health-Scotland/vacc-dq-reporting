@@ -1726,24 +1726,24 @@ for(i in 1:16) {
              "Pneumococcal Vacc - Q21-22" = df_pneum,
              "All query data - Q01-22" = df_all )
 
-    HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
-    setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 3,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 4,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 5,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 6,cols = 1,widths = "auto")
-    setColWidths(HBReportWB,sheet = 7,cols = 1,widths = "auto")
+    HBReportWB <- openxlsx::buildWorkbook(HBReport, asTable = TRUE)
+    openxlsx::setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 3,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 4,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 5,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 6,cols = 1,widths = "auto")
+    openxlsx::setColWidths(HBReportWB,sheet = 7,cols = 1,widths = "auto")
     
 
-    insertImage(HBReportWB,sheet = 1,file = "//PHI_conf/VaccineDM/DQ Scripts/Vacc HB DQ Summary.jpg",
+    openxlsx::insertImage(HBReportWB,sheet = 1,file = "Vacc HB DQ Summary.jpg",
                   width = 10,height = 10,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
 
-    saveWorkbook(HBReportWB,paste("//PHI_conf/VaccineDM/DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
+    openxlsx::saveWorkbook(HBReportWB,paste("DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
     
     rm(HBReport,HBReportWB)
   } else {
-  write_xlsx(df_summ,paste("//PHI_conf/VaccineDM/DQ HB Reports/",hb_cypher[i],"_NULL_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""))
+    writexl::write_xlsx(df_summ,paste("DQ HB Reports/",hb_cypher[i],"_NULL_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""))
   }
 }
   
