@@ -1390,7 +1390,7 @@ gc()
 #############################################################################################
 
 ### EXTRACT VARIABLES FROM COMPLETED PNEUMOCOCCAL VACC RECORDS IN vaccination_event_analysis VIEW
-PneumVaxData <- dbGetQuery(conn, "select 
+PneumVaxData <- odbc::dbGetQuery(conn, "select 
                         source_system_patient_id,
                         patient_derived_encrypted_upi,
                         vacc_source_system_event_id, 
@@ -1416,8 +1416,8 @@ PneumVaxData <- dbGetQuery(conn, "select
                            params = reporting_start_date-1825)
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
-PneumVaxData$vacc_location_name <- replace_non_ascii(PneumVaxData$vacc_location_name,replacement = "")
-PneumVaxData$vacc_performer_name <- replace_non_ascii(PneumVaxData$vacc_performer_name,replacement = "")
+PneumVaxData$vacc_location_name <- textclean::replace_non_ascii(PneumVaxData$vacc_location_name,replacement = "")
+PneumVaxData$vacc_performer_name <- textclean::replace_non_ascii(PneumVaxData$vacc_performer_name,replacement = "")
 
 ### CALCULATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 PneumVaxData$vacc_record_date <- as.Date(substr(PneumVaxData$vacc_record_created_at,1,10))
@@ -1448,7 +1448,7 @@ PneumVaxData <- PneumVaxData %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
-  mutate(CHIcheck = chi_check(patient_derived_chi_number)) # create CHI check data item
+  mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
 ### CREATE PNEUOMOCOCCAL VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1530,13 +1530,13 @@ rm(PneumVaxData,PneumSystemSummary,pneum_chi_check,pneum_vacc_prodSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  write.xlsx(PneumSummaryReport,
-           paste("//PHI_conf/VaccineDM/DQ Summary Reports/Pneumococcal_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+  openxlsx::write.xlsx(PneumSummaryReport,
+           paste("DQ Summary Reports/Pneumococcal_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  write.xlsx(PneumSummaryReport,
-             paste("//PHI_conf/VaccineDM/DQ Summary Reports/Pneumococcal_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+  openxlsx::write.xlsx(PneumSummaryReport,
+             paste("DQ Summary Reports/Pneumococcal_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
     }
