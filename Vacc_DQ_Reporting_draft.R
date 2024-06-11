@@ -997,7 +997,7 @@ gc()
 #############################################################################################
 
 ### EXTRACT VARIABLES FROM COMPLETED SHINGLES VACC RECORDS IN vaccination_event_analysis VIEW
-HZVaxData <- dbGetQuery(conn, "select 
+HZVaxData <- odbc::dbGetQuery(conn, "select 
                         source_system_patient_id,
                         patient_derived_encrypted_upi,
                         vacc_source_system_event_id, 
@@ -1021,8 +1021,8 @@ HZVaxData <- dbGetQuery(conn, "select
                           AND vacc_type_target_disease='Herpes zoster (disorder)' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
-HZVaxData$vacc_location_name <- replace_non_ascii(HZVaxData$vacc_location_name,replacement = "")
-HZVaxData$vacc_performer_name <- replace_non_ascii(HZVaxData$vacc_performer_name,replacement = "")
+HZVaxData$vacc_location_name <- textclean::replace_non_ascii(HZVaxData$vacc_location_name,replacement = "")
+HZVaxData$vacc_performer_name <- textclean::replace_non_ascii(HZVaxData$vacc_performer_name,replacement = "")
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 HZVaxData$vacc_record_date <- as.Date(substr(HZVaxData$vacc_record_created_at,1,10))
@@ -1042,7 +1042,7 @@ HZVaxData <- HZVaxData %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date) %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
-  mutate(CHIcheck = chi_check(patient_derived_chi_number)) # create CHI check data item
+  mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
 ### CREATE SHINGLES VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1356,15 +1356,15 @@ rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_naSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  write.xlsx(HZSummaryReport,
+  openxlsx::write.xlsx(HZSummaryReport,
              paste("//PHI_conf/VaccineDM/DQ Summary Reports/Shingles_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
   } else {
-write.xlsx(HZSummaryReport,
-           paste("//PHI_conf/VaccineDM/DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
-           asTable = TRUE,
-           colWidths = "auto")
+    openxlsx::write.xlsx(HZSummaryReport,
+            paste("//PHI_conf/VaccineDM/DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+            asTable = TRUE,
+            colWidths = "auto")
   }
 
 rm(HZSummaryReport)
