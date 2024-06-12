@@ -6,3 +6,7 @@
 # Excel files
 *.[xX][lL][sS]*
 *.[xX][lL][sS][xX]*
+
+# jpeg files
+*.[jJ][pP][gG]
+
