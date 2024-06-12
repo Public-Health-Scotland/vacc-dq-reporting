@@ -1754,10 +1754,10 @@ for(i in 1:16) {
 ########################################################################
 
 # read in latest query_count output and save as backup
-temp_query_count <- read_excel("//PHI_conf/VaccineDM/DQ Report Query count.xlsx")
+temp_query_count <- readxl::read_excel("DQ Report Query count.xlsx")
 
-write.xlsx(temp_query_count,
-           paste("//PHI_conf/VaccineDM/Archive/DQ Report Query count_backup.xlsx"),
+openxlsx::write.xlsx(temp_query_count,
+           paste("Archive/DQ Report Query count_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
 
@@ -1768,7 +1768,7 @@ query_count <- all_queries %>% group_by(QueryName) %>%
   select(QueryName,date_latest_run,record_count_latest_run)
 
 ### READ IN AND UPDATE QUERY COUNT FROM PREVIOUS RUN
-df <- readxl::read_xlsx("//PHI_conf/VaccineDM/DQ Report Query count.xlsx") %>% 
+df <- temp_query_count %>% 
   select(-date_previous_run,-record_count_previous_run) %>% 
   rename("date_previous_run" = date_latest_run) %>% 
   rename("record_count_previous_run" = record_count_latest_run)
@@ -1781,8 +1781,8 @@ df2$date_latest_run <- as.Date(df2$date_latest_run,"%Y-%m-%d")
 df2$date_previous_run <- as.Date(df2$date_previous_run,"%Y-%m-%d")
 
 # Save out collated tables into an excel file
-write.xlsx(df2,
-           paste("//PHI_conf/VaccineDM/DQ Report Query count.xlsx"),
+openxlsx::write.xlsx(df2,
+           paste("DQ Report Query count.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
 
