@@ -299,8 +299,7 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc,
-                        days_between_doses
+                        age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='COVID-19'
@@ -332,6 +331,7 @@ CovVaxData$"cov_booster_interval (days)" [CovVaxData$vacc_booster=="FALSE"] <- N
 
 ### CREATE BLANK PLACEHOLDER COLUMNS
 CovVaxData$"flu_interval (days)" <- NA
+CovVaxData$"hz_interval (days)" <- NA
 CovVaxData$"pneum_vacc_interval (weeks)" <- NA
 CovVaxData$sort_date <- NA
 
@@ -840,8 +840,7 @@ FluVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc,
-                        days_between_doses
+                        age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='Influenza (disorder)'
@@ -873,7 +872,7 @@ FluVaxData <- FluVaxData %>%
 FluVaxData$"flu_interval (days)" <- ifelse(FluVaxData$dose_number=="1",NA,FluVaxData$"flu_interval (days)")
 FluVaxData$"flu_interval (days)" [is.na(FluVaxData$patient_derived_encrypted_upi)] <- NA
 
-#FluVaxData$"flu_interval (days)" <- NA
+FluVaxData$"hz_interval (days)" <- NA
 FluVaxData$"pneum_vacc_interval (weeks)" <- NA
 FluVaxData$sort_date <- NA
 
@@ -1014,8 +1013,7 @@ HZVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc,
-                        days_between_doses
+                        age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='Herpes zoster (disorder)' ")
@@ -1033,6 +1031,18 @@ HZVaxData$dups_same_day_flag <- NA
 HZVaxData$VMT_only_dups_flag <- NA
 HZVaxData$"cov_booster_interval (days)" <- NA
 HZVaxData$"flu_interval (days)" <- NA
+
+### CALCULATE INTERVAL BETWEEN VACCINES PER PATIENT
+HZVaxData <- HZVaxData %>%
+  arrange(patient_derived_encrypted_upi,vacc_occurence_time) %>% 
+  group_by(patient_derived_encrypted_upi) %>%
+  mutate(dose_number = row_number()) %>% mutate(doses = n()) %>% ungroup() %>% 
+  mutate(prev_vacc_date=lag(vacc_occurence_time)) %>%
+  mutate("hz_interval (days)"=as.integer(difftime(vacc_occurence_time,prev_vacc_date,units = "days")))
+
+HZVaxData$"hz_interval (days)" <- ifelse(HZVaxData$dose_number=="1",NA,HZVaxData$"hz_interval (days)")
+HZVaxData$"hz_interval (days)" [is.na(HZVaxData$patient_derived_encrypted_upi)] <- NA
+
 HZVaxData$"pneum_vacc_interval (weeks)" <- NA
 HZVaxData$sort_date <- NA
 
@@ -1219,7 +1229,7 @@ hz_dose2_Zost <- hz_dose2_Zost %>% select(-Date_Administered,-CHIcheck)
 ### CREATE TABLE OF RECORDS & SUMMARY OF SHINGRIX DOSE 2 GIVEN AT AN INTERVAL OF <56 DAYS
 hz_dose2_early <- hz_dose2 %>% 
   filter(vacc_product_name == "Shingles Vaccine Shingrix GlaxoSmithKline") %>%
-  filter(days_between_doses < "56") %>% 
+  filter(`hz_interval (days)` < "56") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "16. HZ Dose 2 interval < 56 days")
@@ -1229,7 +1239,7 @@ hz_dose2_early <- hz_dose2 %>%
       filter(patient_derived_upi_number %in% hz_dose1$patient_derived_upi_number)
 
 hz_dose2_earlySumm <- hz_dose2_early %>%
-  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, days_between_doses) %>%
+  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, `hz_interval (days)`) %>%
   summarise(record_count = n())
 
 hz_dose2_early <- hz_dose2_early %>% select(-Date_Administered,-CHIcheck)
@@ -1407,8 +1417,7 @@ PneumVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc,
-                        days_between_doses
+                        age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='Pneumococcal infectious disease (disorder)'
@@ -1428,6 +1437,7 @@ PneumVaxData$dups_same_day_flag <- NA
 PneumVaxData$VMT_only_dups_flag <- NA
 PneumVaxData$"cov_booster_interval (days)" <- NA
 PneumVaxData$"flu_interval (days)" <- NA
+PneumVaxData$"hz_interval (days)" <- NA
 
 ### CREATE AN INTERVAL BETWEEN PNEUMOCOCCAL VACCINES PER PATIENT
 PneumVaxData <- PneumVaxData %>%
