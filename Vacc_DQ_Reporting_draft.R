@@ -71,21 +71,16 @@ start.time <- Sys.time()
 ### BEFORE LOADING
 #install.packages("svDialogs")
 
-### LOAD PACKAGES TO LIBRARIES
+### LOAD PACKAGES TO LIBRARIES - HASHED OUT PACKAGES ARE USED IN SCRIPT BUT WITH
+### FUNCTION CALL SO DON'T NEED LOADED AT START EXCEPT AS CHECK FOR 1ST TIME USERS
 library(dplyr)
-# library(stringr)
-# library(tidyverse)
-# library(tidyr)
-# library(magrittr)
+library(openxlsx)
+library(readxl)
 # library(writexl)
-# library(openxlsx)
 # library(lubridate)
-# library(janitor)
 # library(textclean)
-# library(keyring)
 # library(odbc)
 # library(phsmethods)
-library(readxl)
 # library(svDialogs)
 
 ### ESTABLISH ODBC CONNECTION TO DVPROD MANUALLY
@@ -152,9 +147,9 @@ PneumSystemSummary <- Vaxeventtot %>%
   group_by(vacc_status,vacc_type_target_disease,vacc_data_source) %>% 
   summarise(record_count = sum(number_of_vacc_events))
 
-### UN-HASH AND RUN THE BELOW LINE IF NOT GOING ON TO RUN SECTION B2
-#rm(Vaxeventtot)
-
+### UN-HASH AND RUN THE BELOW 2 LINES IF NOT GOING ON TO RUN SECTION B2
+# rm(Vaxeventtot)
+# gc()
 
 ########################################################################
 #############################  SECTION B2 ##############################
@@ -223,20 +218,20 @@ SystemSummaryFull <-
 options(openxlsx.dateFormat = "yyyy-mm-dd")
 
 # Overwrite summary Excel file with latest 8 weeks
-openxlsx::write.xlsx(SystemSummaryFull,
+write.xlsx(SystemSummaryFull,
            paste("VDL_summary.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
 
 # save backup of workbook every month
 if (lubridate::day(Sys.Date()) < 8) {
-  openxlsx::write.xlsx(SystemSummaryFull,
+  write.xlsx(SystemSummaryFull,
            paste("Archive/VDL_summary_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto") }
 
 # Save previous run's figures as backup
-openxlsx::write.xlsx(sheet1,
+write.xlsx(sheet1,
            paste("Archive/VDL_summary_sheet1_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
@@ -271,7 +266,6 @@ Vaxpatientraw <- odbc::dbGetQuery(conn, "select
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN PATIENT ANALYSIS DATA
 Vaxpatientraw$patient_family_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_family_name,replacement = "")
 Vaxpatientraw$patient_given_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_given_name,replacement = "")
-
 
 ########################################################################
 ###############################  SECTION D1 ############################
@@ -788,12 +782,12 @@ rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  openxlsx::write.xlsx(cov_SummaryReport,
+  write.xlsx(cov_SummaryReport,
            paste("DQ Summary Reports/Covid-19_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  openxlsx::write.xlsx(cov_SummaryReport,
+  write.xlsx(cov_SummaryReport,
              paste("DQ Summary Reports/Covid-19_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
@@ -964,12 +958,12 @@ rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_naSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  openxlsx::write.xlsx(flu_SummaryReport,
+  write.xlsx(flu_SummaryReport,
            paste("DQ Summary Reports/Flu_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  openxlsx::write.xlsx(flu_SummaryReport,
+  write.xlsx(flu_SummaryReport,
              paste("DQ Summary Reports/Flu_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
@@ -1366,12 +1360,12 @@ rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_naSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  openxlsx::write.xlsx(HZSummaryReport,
+  write.xlsx(HZSummaryReport,
              paste("DQ Summary Reports/Shingles_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
   } else {
-    openxlsx::write.xlsx(HZSummaryReport,
+    write.xlsx(HZSummaryReport,
             paste("DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
             asTable = TRUE,
             colWidths = "auto")
@@ -1540,12 +1534,12 @@ rm(PneumVaxData,PneumSystemSummary,pneum_chi_check,pneum_vacc_prodSumm,
 
 #Saves out collated tables into an excel file
 if (answer==1) {
-  openxlsx::write.xlsx(PneumSummaryReport,
+  write.xlsx(PneumSummaryReport,
            paste("DQ Summary Reports/Pneumococcal_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
            asTable = TRUE,
            colWidths = "auto")
   } else {
-  openxlsx::write.xlsx(PneumSummaryReport,
+  write.xlsx(PneumSummaryReport,
              paste("DQ Summary Reports/Pneumococcal_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
@@ -1736,20 +1730,20 @@ for(i in 1:16) {
              "Pneumococcal Vacc - Q21-22" = df_pneum,
              "All query data - Q01-22" = df_all )
 
-    HBReportWB <- openxlsx::buildWorkbook(HBReport, asTable = TRUE)
-    openxlsx::setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 3,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 4,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 5,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 6,cols = 1,widths = "auto")
-    openxlsx::setColWidths(HBReportWB,sheet = 7,cols = 1,widths = "auto")
+    HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
+    setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 3,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 4,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 5,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 6,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 7,cols = 1,widths = "auto")
     
 
-    openxlsx::insertImage(HBReportWB,sheet = 1,file = "Vacc HB DQ Summary.jpg",
+    insertImage(HBReportWB,sheet = 1,file = "Vacc HB DQ Summary.jpg",
                   width = 10,height = 10,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
 
-    openxlsx::saveWorkbook(HBReportWB,paste("DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
+    saveWorkbook(HBReportWB,paste("DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
     
     rm(HBReport,HBReportWB)
   } else {
@@ -1766,7 +1760,7 @@ for(i in 1:16) {
 # read in latest query_count output and save as backup
 temp_query_count <- readxl::read_excel("DQ Report Query count.xlsx")
 
-openxlsx::write.xlsx(temp_query_count,
+write.xlsx(temp_query_count,
            paste("Archive/DQ Report Query count_backup.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
@@ -1791,7 +1785,7 @@ df2$date_latest_run <- as.Date(df2$date_latest_run,"%Y-%m-%d")
 df2$date_previous_run <- as.Date(df2$date_previous_run,"%Y-%m-%d")
 
 # Save out collated tables into an excel file
-openxlsx::write.xlsx(df2,
+write.xlsx(df2,
            paste("DQ Report Query count.xlsx"),
            asTable = TRUE,
            colWidths = "auto")
