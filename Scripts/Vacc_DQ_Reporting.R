@@ -1044,7 +1044,7 @@ HZVaxData$sort_date <- NA
 HZVaxData <- HZVaxData %>%
   inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
-  select(-patient_derived_encrypted_upi,-vacc_record_date) %>%
+  select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
@@ -1223,7 +1223,7 @@ hz_dose2_Zost <- hz_dose2_Zost %>% select(-Date_Administered,-CHIcheck)
 ### CREATE TABLE OF RECORDS & SUMMARY OF SHINGRIX DOSE 2 GIVEN AT AN INTERVAL OF <56 DAYS
 hz_dose2_early <- hz_dose2 %>% 
   filter(vacc_product_name == "Shingles Vaccine Shingrix GlaxoSmithKline") %>%
-  filter(`hz_interval (days)` < "56") %>% 
+  filter(`hz_interval (days)` < 56) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "16. HZ Dose 2 interval < 56 days")
@@ -1347,7 +1347,7 @@ HZSummaryReport <-
        "2 or More First Doses" = hz_dose1x2Summ,
        "2 or More Second Doses" = hz_dose2x2Summ,
        "Dose 2 Zostavax" = hz_dose2_ZostSumm,
-       "Dose 2 Shingrix<60days" = hz_dose2_earlySumm,
+       "Dose 2 Shingrix<56days" = hz_dose2_earlySumm,
        "Shingrix D2 Zostavax D1" = hz_wrongvaxtypeSumm,
        "Dose 2, no dose 1" = hz_dose2_nodose1Summ,
        "Zostavax given after 01.09.2023" = hz_zostavax_errorSumm,
