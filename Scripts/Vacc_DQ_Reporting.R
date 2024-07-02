@@ -1366,7 +1366,7 @@ if (answer==1) {
              colWidths = "auto")
   } else {
     write.xlsx(HZSummaryReport,
-            paste("Output/DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+            paste("Outputs/DQ Summary Reports/Shingles_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
             asTable = TRUE,
             colWidths = "auto")
   }
@@ -1758,7 +1758,7 @@ for(i in 1:16) {
 ########################################################################
 
 # read in latest query_count output and save as backup
-temp_query_count <- readxl::read_excel("Putputs/DQ Report Query count.xlsx")
+temp_query_count <- readxl::read_excel("Outputs/DQ Report Query count.xlsx")
 
 write.xlsx(temp_query_count,
            paste("Outputs/Archive/DQ Report Query count_backup.xlsx"),
