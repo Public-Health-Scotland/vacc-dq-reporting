@@ -360,13 +360,12 @@ cov_vacc_doseSumm <- CovVaxData %>%
   summarise(record_count = n()) 
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS MISSING (NA) CHI NUMBER
-cov_chi_na <- CovVaxData %>% filter(grepl("Missing",CHIcheck)) %>% 
+cov_chi_inv <- CovVaxData %>% filter(CHIcheck!="Valid CHI") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
-  select(-CHIcheck) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "01. Missing CHI number")
+  mutate(QueryName = "01. Missing/Invalid CHI number")
 
-cov_chi_naSumm <- cov_chi_na %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source) %>% 
+cov_chi_invSumm <- cov_chi_inv %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source,CHIcheck) %>% 
   summarise(record_count = n())
 
 ### CREATE TABLE OF PATIENTS WITH 2 OR MORE DOSE 1 RECORDS AND SUMMARY
@@ -760,7 +759,7 @@ cov_SummaryReport <-
        "CHI Check" = cov_chi_check,
        "Vacc Product Type" = cov_vacc_prodSumm,
        "Dose Given After 01.04.2024" = cov_vacc_doseSumm,
-       "Missing CHIs" = cov_chi_naSumm,
+       "Missing CHIs" = cov_chi_invSumm,
        "2 or More First Doses" = cov_dose1x2Summ,
        "2 or More Second Doses" = cov_dose2x2Summ,
        "2 or More Third doses" = cov_dose3x2Summ,
@@ -774,7 +773,7 @@ cov_SummaryReport <-
        "Dose 1 and booster, no dose 2" = cov_dose1andboosterSumm)
 
 rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
-   cov_vacc_doseSumm,cov_chi_naSumm,
+   cov_vacc_doseSumm,cov_chi_invSumm,
    cov_dose1x2Summ,cov_dose2x2Summ,cov_dose3x2Summ,cov_dose4x2Summ,cov_booster_intervalDQSumm,
    cov_age12Summ,cov_under12fulldoseSumm,cov_over11_under5_childdoseSumm,
    cov_over4_infant_doseSumm,cov_dose2nodose1Summ,cov_dose1andboosterSumm,
@@ -798,11 +797,11 @@ rm(cov_SummaryReport)
 ### COLLATE COVID QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- rbind(cov_chi_na,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2)
+multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2)
 covid_vacc <- rbind(cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
                     cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster)
 
-rm(cov_chi_na,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
+rm(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
    cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
    cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster)
 
