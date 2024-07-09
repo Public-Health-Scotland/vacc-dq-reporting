@@ -303,6 +303,22 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
 CovVaxData$vacc_location_name <- textclean::replace_non_ascii(CovVaxData$vacc_location_name,replacement = "")
 CovVaxData$vacc_performer_name <- textclean::replace_non_ascii(CovVaxData$vacc_performer_name,replacement = "")
 
+### EXTRACT COVID-19 COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
+cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+                                      cohort,
+                                      cohort_source,
+                                      cohort_extract_time,
+                                      cohort_reporting_label,
+                                      cohort_description,
+                                      cohort_target_diseases,
+                                      patient_cohort_created_at,
+                                      patient_cohort_updated_at,
+                                      patient_cohort_removal_datetime,
+                                      patient_cohort_removal_status,
+                                      cohort_phase
+                          from vaccination.vaccination_patient_cohort_analysis
+            where cohort_target_diseases like '%840539006 - COVID-19%' ")
+
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 CovVaxData$vacc_record_date <- as.Date(substr(CovVaxData$vacc_record_created_at,1,10))
 CovVaxData$days_between_vacc_and_recording <- as.double(difftime(CovVaxData$vacc_record_date,CovVaxData$vacc_occurence_time,units="days"))
@@ -329,9 +345,10 @@ CovVaxData$"hz_interval (days)" <- NA
 CovVaxData$"pneum_vacc_interval (weeks)" <- NA
 CovVaxData$sort_date <- NA
 
-### CREATE COVID-19 VACC DATAFRAME BY JOINING COVID VACC EVENT RECORDS WITH PATIENT RECORDS
+### CREATE COVID-19 VACC DATAFRAME BY JOINING COVID VACC EVENT RECORDS WITH PATIENT & COHORT RECORDS
 CovVaxData <- CovVaxData %>%
   inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
+  left_join(cohort, by=("source_system_patient_id")) %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
