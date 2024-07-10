@@ -359,14 +359,18 @@ cov_vacc_doseSumm <- CovVaxData %>%
            vacc_booster) %>%
   summarise(record_count = n()) 
 
-### CREATE TABLE AND SUMMARY OF PATIENTS MISSING (NA) CHI NUMBER
+### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
 cov_chi_inv <- CovVaxData %>% filter(CHIcheck!="Valid CHI") %>% 
-  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>%
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "01. Missing/Invalid CHI number")
+  mutate(QueryName = paste0("01. Missing/Invalid CHI number - ",CHIcheck))
 
 cov_chi_invSumm <- cov_chi_inv %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source,CHIcheck) %>% 
   summarise(record_count = n())
+
+cov_chi_inv <- cov_chi_inv %>% select(-CHIcheck)
+
+CovVaxData <- CovVaxData %>% select(-CHIcheck)
 
 ### CREATE TABLE OF PATIENTS WITH 2 OR MORE DOSE 1 RECORDS AND SUMMARY
 cov_dose1 <- CovVaxData %>% filter(vacc_dose_number == "1" & vacc_booster == "FALSE")
@@ -390,7 +394,7 @@ cov_dose1x2 <- cov_dose1x2 %>% left_join(cov_dose1x2sort,by="patient_derived_upi
   mutate(sort_date = latest_date) %>% 
   mutate(QueryName = "02. COV Two or more dose 1") %>%
   filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date,-CHIcheck)
+  select(-latest_date)
 
 rm(cov_dose1x2IDs,cov_dose1x2sort)
 
@@ -454,7 +458,7 @@ cov_dose2x2 <- cov_dose2x2 %>% left_join(cov_dose2x2sort,by="patient_derived_upi
   mutate(sort_date = latest_date)%>%
   mutate(QueryName = "03. COV Two or more dose 2") %>%
   filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date,-CHIcheck)
+  select(-latest_date)
 
 rm(cov_dose2x2IDs,cov_dose2x2sort)
 
@@ -518,7 +522,7 @@ cov_dose3x2 <- cov_dose3x2 %>% left_join(cov_dose3x2sort,by="patient_derived_upi
   mutate(sort_date = latest_date) %>%
   mutate(QueryName = "04. COV Two or more dose 3") %>% 
   filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date,-CHIcheck)
+  select(-latest_date)
 
 rm(cov_dose3x2IDs,cov_dose3x2sort)
 
@@ -582,7 +586,7 @@ cov_dose4x2 <- cov_dose4x2 %>% left_join(cov_dose4x2sort,by="patient_derived_upi
   mutate(sort_date = latest_date) %>%
   mutate(QueryName = "05. COV Two or more dose 4") %>% 
   filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date,-CHIcheck)
+  select(-latest_date)
 
 rm(cov_dose4x2IDs,cov_dose4x2sort)
 
@@ -631,8 +635,7 @@ cov_booster_intervalDQ <- cov_booster %>%
   filter(`cov_booster_interval (days)` < 84) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "06. COV Booster interval < 12 weeks") %>% 
-  select(-CHIcheck)
+  mutate(QueryName = "06. COV Booster interval < 12 weeks")
 
 cov_booster_intervalDQSumm <- cov_booster_intervalDQ %>% 
   group_by(vacc_location_health_board_name,vacc_location_name,`cov_booster_interval (days)`) %>% 
@@ -652,8 +655,7 @@ cov_under12fulldose <- CovVaxData %>%
             !grepl("Children",vacc_product_name) )) %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "07. COV Under 12 adult dose") %>% 
-  select(-CHIcheck)
+  mutate(QueryName = "07. COV Under 12 adult dose")
 
 cov_under12fulldoseSumm <- cov_under12fulldose %>% 
   group_by(vacc_location_health_board_name,vacc_location_name,vacc_product_name,age_at_vacc) %>%
@@ -678,8 +680,7 @@ cov_over11_under5_childdose <- anti_join(cov_age12childdose,cov_age11childdose,b
   arrange(desc(vacc_event_created_at)) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "08. COV Over 11 or under 5 paediatric dose") %>% 
-  select(-CHIcheck)
+  mutate(QueryName = "08. COV Over 11 or under 5 paediatric dose")
 
 cov_over11_under5_childdoseSumm <- cov_over11_under5_childdose %>% 
   group_by(vacc_location_health_board_name,vacc_location_name,vacc_product_name,age_at_vacc) %>%
@@ -706,8 +707,7 @@ cov_over4_infant_dose <- anti_join(cov_age5_infantdose,cov_age4_infantdose,by="p
   arrange(desc(vacc_event_created_at)) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "09. COV Over 4 infant dose") %>% 
-  select(-CHIcheck)
+  mutate(QueryName = "09. COV Over 4 infant dose")
 
 cov_over4_infant_doseSumm <- cov_over4_infant_dose %>% 
   group_by(vacc_location_health_board_name,vacc_location_name,vacc_product_name,age_at_vacc) %>%
@@ -719,8 +719,7 @@ rm(cov_age4_infantdose,cov_age5_infantdose,cov_over5_infant_dose)
 cov_dose2nodose1 <- anti_join(cov_dose2, cov_dose1, by="patient_derived_upi_number") %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
-  mutate(QueryName = "10. COV Dose 2, no dose 1") %>% 
-  select(-CHIcheck)
+  mutate(QueryName = "10. COV Dose 2, no dose 1")
 
 cov_dose2nodose1Summ <- cov_dose2nodose1 %>% group_by(vacc_location_health_board_name) %>% 
   summarise(record_count=n())
@@ -743,7 +742,7 @@ cov_dose1andbooster <- cov_dose1andbooster %>% left_join(cov_dose1andboostersort
   mutate(sort_date = latest_date) %>% 
   mutate(QueryName = "11. COV Dose 1 and booster, no dose 2") %>% 
   filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date,-CHIcheck)
+  select(-latest_date)
 
 rm(cov_dose1andboostersort,cov_dose1andboosterIDs)
 
@@ -759,7 +758,7 @@ cov_SummaryReport <-
        "CHI Check" = cov_chi_check,
        "Vacc Product Type" = cov_vacc_prodSumm,
        "Dose Given After 01.04.2024" = cov_vacc_doseSumm,
-       "Missing CHIs" = cov_chi_invSumm,
+       "Missing or Invalid CHIs" = cov_chi_invSumm,
        "2 or More First Doses" = cov_dose1x2Summ,
        "2 or More Second Doses" = cov_dose2x2Summ,
        "2 or More Third doses" = cov_dose3x2Summ,
@@ -892,16 +891,18 @@ flu_vacc_prodSumm <- FluVaxData %>%
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
   summarise(record_count = n()) 
 
-### CREATE TABLE AND SUMMARY OF PATIENTS MISSING (NA) CHI NUMBER
-flu_chi_na <- FluVaxData %>% filter(grepl("Missing",CHIcheck)) %>% 
+### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
+flu_chi_inv <- FluVaxData %>% filter(CHIcheck!="Valid CHI") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "01. Missing CHI number")
+  mutate(QueryName = paste0("01. Missing/Invalid CHI number - ",CHIcheck))
 
-flu_chi_naSumm <- flu_chi_na %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered) %>% 
+flu_chi_invSumm <- flu_chi_inv %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, CHIcheck,Date_Administered) %>% 
   summarise(record_count = n())
 
-flu_chi_na <- flu_chi_na %>% select(-Date_Administered,-CHIcheck)
+flu_chi_inv <- flu_chi_inv %>% select(-Date_Administered,-CHIcheck)
+
+FluVaxData <- FluVaxData %>% select(-CHIcheck)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATIONS GIVEN AT INTERVAL OF < 4 WEEKS
 flu_interval <- FluVaxData %>% filter(`flu_interval (days)`<28) %>% 
@@ -912,7 +913,7 @@ flu_interval <- FluVaxData %>% filter(`flu_interval (days)`<28) %>%
 flu_intervalSumm <- flu_interval %>% group_by(vacc_location_health_board_name,vacc_location_name,`flu_interval (days)`,Date_Administered) %>% 
   summarise(record_count = n())
 
-flu_interval <- flu_interval %>% select(-Date_Administered,-CHIcheck)
+flu_interval <- flu_interval %>% select(-Date_Administered)
   
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATIONS THAT OCCUR BEFORE 06/09/2021
 flu_early <- FluVaxData %>% filter(vacc_occurence_time < "2021-09-06") %>% 
@@ -923,7 +924,7 @@ flu_early <- FluVaxData %>% filter(vacc_occurence_time < "2021-09-06") %>%
 flu_earlySumm <- flu_early %>% group_by(vacc_location_health_board_name,vacc_location_name,Date_Administered) %>%
   summarise(record_count = n())
 
-flu_early <- flu_early %>% select(-Date_Administered,-CHIcheck)
+flu_early <- flu_early %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATION GIVEN AT AGE <2 OR >17
 flu_fluenz_ageDQ <- FluVaxData %>%
@@ -937,7 +938,7 @@ flu_fluenz_ageDQSumm <- flu_fluenz_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, Date_Administered, age_at_vacc) %>%
   summarise(record_count = n())
 
-flu_fluenz_ageDQ <- flu_fluenz_ageDQ %>% select(-Date_Administered,-CHIcheck)
+flu_fluenz_ageDQ <- flu_fluenz_ageDQ %>% select(-Date_Administered)
 
 ### CREATE & SAVE OUT FLU VACC SUMMARY REPORT
 #############################################################################################
@@ -947,12 +948,12 @@ flu_SummaryReport <-
   list("System Summary" = FluSystemSummary,
        "CHI Check" = flu_chi_check,
        "Vacc Product Type" = flu_vacc_prodSumm,
-       "Missing CHIs" = flu_chi_naSumm,
+       "Missing or Invalid CHIs" = flu_chi_invSumm,
        "Interval < 4 weeks" =  flu_intervalSumm,
        "Vaccine before 06.09.2021" = flu_earlySumm,
        "Fluenz Given to Aged <2 or >17" = flu_fluenz_ageDQSumm)
 
-rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_naSumm,
+rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_invSumm,
    flu_intervalSumm,flu_earlySumm,flu_fluenz_ageDQSumm)
 
 #Saves out collated tables into an excel file
@@ -973,10 +974,10 @@ rm(flu_SummaryReport)
 ### COLLATE FLU QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- multi_vacc %>% rbind(flu_chi_na)
+multi_vacc <- multi_vacc %>% rbind(flu_chi_inv)
 flu_vacc <- rbind(flu_interval,flu_early,flu_fluenz_ageDQ)
 
-rm(flu_chi_na,flu_interval,flu_early,flu_fluenz_ageDQ)
+rm(flu_chi_inv,flu_interval,flu_early,flu_fluenz_ageDQ)
 
 gc()
 
@@ -1062,17 +1063,19 @@ hz_vacc_prodSumm <- HZVaxData %>%
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
   summarise(record_count = n()) 
 
-### CREATE TABLE AND SUMMARY OF PATIENTS MISSING (NA) CHI NUMBER
-hz_chi_na  <- HZVaxData %>% filter(grepl("Missing",CHIcheck)) %>% 
+### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
+hz_chi_inv  <- HZVaxData %>% filter(CHIcheck!="Valid CHI") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "01. Missing CHI number")
+  mutate(QueryName = paste0("01. Missing/Invalid CHI number - ",CHIcheck))
 
-hz_chi_naSumm <- hz_chi_na %>%
-  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered) %>% 
+hz_chi_invSumm <- hz_chi_inv %>%
+  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, CHIcheck, Date_Administered) %>% 
   summarise(record_count = n())
 
-hz_chi_na <- hz_chi_na %>% select(-CHIcheck,-Date_Administered)
+hz_chi_inv <- hz_chi_inv %>% select(-CHIcheck,-Date_Administered)
+
+HZVaxData <- HZVaxData %>% select(-CHIcheck)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS
 hz_dose1 <- HZVaxData %>% filter(vacc_dose_number == "1")
@@ -1138,7 +1141,7 @@ hz_dose1x2Summ <- hz_dose1x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_dose1x2 <- hz_dose1x2 %>% select(-Date_Administered,-CHIcheck)
+hz_dose1x2 <- hz_dose1x2 %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 2 VACCINATIONS
 hz_dose2 <- HZVaxData %>% filter(vacc_dose_number == "2")
@@ -1204,7 +1207,7 @@ hz_dose2x2Summ <- hz_dose2x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_dose2x2 <- hz_dose2x2 %>% select(-Date_Administered,-CHIcheck)
+hz_dose2x2 <- hz_dose2x2 %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF ZOSTAVAX GIVEN FOR DOSE 2
 hz_dose2_Zost <- hz_dose2 %>% 
@@ -1217,7 +1220,7 @@ hz_dose2_ZostSumm <- hz_dose2_Zost %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_dose2_Zost <- hz_dose2_Zost %>% select(-Date_Administered,-CHIcheck)
+hz_dose2_Zost <- hz_dose2_Zost %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF SHINGRIX DOSE 2 GIVEN AT AN INTERVAL OF <56 DAYS
 hz_dose2_early <- hz_dose2 %>% 
@@ -1235,7 +1238,7 @@ hz_dose2_earlySumm <- hz_dose2_early %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, `hz_interval (days)`) %>%
   summarise(record_count = n())
 
-hz_dose2_early <- hz_dose2_early %>% select(-Date_Administered,-CHIcheck)
+hz_dose2_early <- hz_dose2_early %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF SHINGRIX DOSE 2 GIVEN AFTER ZOSTAVAX DOSE 1
 hz_zostd1 <- hz_dose1 %>% 
@@ -1272,7 +1275,7 @@ hz_wrongvaxtypeSumm <- hz_wrongvaxtype %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_wrongvaxtype <- hz_wrongvaxtype %>% select(-Date_Administered,-CHIcheck)
+hz_wrongvaxtype <- hz_wrongvaxtype %>% select(-Date_Administered)
 
 rm(hz_zostd1,hz_shingrixd1,hz_shingrixd2,hz_wrongvaxtypeIDs,hz_wrongvaxtype_sort)
 
@@ -1286,7 +1289,7 @@ hz_dose2_nodose1Summ <- hz_dose2_nodose1 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_dose2_nodose1 <- hz_dose2_nodose1 %>% select(-Date_Administered,-CHIcheck)
+hz_dose2_nodose1 <- hz_dose2_nodose1 %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF ZOSTAVAX VACCINE GIVEN AFTER 01.09.2023
 hz_zostavax_error <- HZVaxData %>% 
@@ -1300,7 +1303,7 @@ hz_zostavax_errorSumm <- hz_zostavax_error %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered,-CHIcheck)
+hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
 ### NOTE THAT THIS QUERY DOES NOT CONSIDER IMMUNOCOMPROMISED PATIENTS
@@ -1332,7 +1335,7 @@ hz_ageDQSumm <- hz_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
   summarise(record_count = n())
 
-hz_ageDQ <- hz_ageDQ %>% select(-Date_Administered,-CHIcheck)
+hz_ageDQ <- hz_ageDQ %>% select(-Date_Administered)
 
 ### CREATE & SAVE OUT SHINGLES VACC SUMMARY REPORT
 #############################################################################################
@@ -1342,7 +1345,7 @@ HZSummaryReport <-
   list("System Summary" = HZSystemSummary,
        "CHI Check" = hz_chi_check,
        "Vacc Product Type" = hz_vacc_prodSumm,
-       "Missing CHIs" = hz_chi_naSumm,
+       "Missing or Invalid CHIs" = hz_chi_invSumm,
        "2 or More First Doses" = hz_dose1x2Summ,
        "2 or More Second Doses" = hz_dose2x2Summ,
        "Dose 2 Zostavax" = hz_dose2_ZostSumm,
@@ -1352,7 +1355,7 @@ HZSummaryReport <-
        "Zostavax given after 01.09.2023" = hz_zostavax_errorSumm,
        "Vacc outwith age guidance" = hz_ageDQSumm)
 
-rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_naSumm,
+rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_invSumm,
    hz_dose1x2Summ,hz_dose2x2Summ,hz_dose2_ZostSumm,hz_dose2_earlySumm,
    hz_wrongvaxtypeSumm,hz_dose2_nodose1Summ,hz_zostavax_errorSumm,hz_ageDQSumm,
    hz_dose1,hz_dose2)
@@ -1375,11 +1378,11 @@ rm(HZSummaryReport)
 ### COLLATE SHINGLES QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- multi_vacc %>% rbind(hz_chi_na,hz_dose1x2,hz_dose2x2)
+multi_vacc <- multi_vacc %>% rbind(hz_chi_inv,hz_dose1x2,hz_dose2x2)
 hz_vacc <- rbind(hz_dose2_Zost,hz_dose2_early,hz_wrongvaxtype,hz_dose2_nodose1,
                  hz_zostavax_error,hz_ageDQ)
 
-rm(hz_chi_na,hz_dose1x2,hz_dose2x2,hz_dose2_Zost,hz_dose2_early,hz_wrongvaxtype,
+rm(hz_chi_inv,hz_dose1x2,hz_dose2x2,hz_dose2_Zost,hz_dose2_early,hz_wrongvaxtype,
    hz_dose2_nodose1,hz_zostavax_error,hz_ageDQ)
 
 gc()
@@ -1468,16 +1471,18 @@ pneum_vacc_prodSumm <- PneumVaxData %>%
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
   summarise(record_count = n()) 
 
-### CREATE TABLE AND SUMMARY OF PATIENTS MISSING (NA) CHI NUMBER
-pneum_chi_na  <- PneumVaxData %>% filter(grepl("Missing",CHIcheck)) %>%
+### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
+pneum_chi_inv  <- PneumVaxData %>% filter(CHIcheck!="Valid CHI") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>%
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "01. Missing CHI number") 
+  mutate(QueryName = paste0("01. Missing/Invalid CHI number - ",CHIcheck)) 
 
-pneum_chi_naSumm <- pneum_chi_na %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered) %>% 
+pneum_chi_invSumm <- pneum_chi_inv %>% group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source,CHIcheck,Date_Administered) %>% 
   summarise(record_count = n())
 
-pneum_chi_na <- pneum_chi_na %>% select(-Date_Administered,-CHIcheck)
+pneum_chi_inv <- pneum_chi_inv %>% select(-Date_Administered,-CHIcheck)
+
+PneumVaxData <- PneumVaxData %>% select(-CHIcheck)
 
 ### CREATE TABLE OF RECORDS & SUMMARY WITH INTERVAL OF LESS THAN 5YRS (260  WEEKS)
 pneum_early <- PneumVaxData %>%
@@ -1489,7 +1494,7 @@ pneum_earlySumm <- pneum_early %>%
   summarise(record_count = n())
 
 pneum_early <- pneum_early %>%
-  select(-Date_Administered,-CHIcheck) %>% 
+  select(-Date_Administered) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "21. PNEUM Vacc interval < 260 weeks") 
 
@@ -1511,7 +1516,7 @@ pneum_ageDQSumm <- pneum_ageDQ %>%
   summarise(record_count = n())
 
 pneum_ageDQ <- pneum_ageDQ %>%
-  select(-Date_Administered,-CHIcheck) %>% 
+  select(-Date_Administered) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "22. PNEUM Age < 2 years") 
 
@@ -1523,13 +1528,13 @@ PneumSummaryReport <-
   list("System Summary" = PneumSystemSummary,
        "CHI Check" = pneum_chi_check,
        "Vacc Product Type" = pneum_vacc_prodSumm,
-       "Missing CHIs" = pneum_chi_naSumm,
+       "Missing or Invalid CHIs" = pneum_chi_invSumm,
        "Interval <5years" = pneum_earlySumm,
        "Multiples Doses Age>65" = pneum_ageDQ_oldSumm,
        "Vaccine Given to Age<2" = pneum_ageDQSumm)
 
 rm(PneumVaxData,PneumSystemSummary,pneum_chi_check,pneum_vacc_prodSumm,
-   pneum_chi_naSumm,pneum_earlySumm,pneum_ageDQ_oldSumm,pneum_ageDQSumm)
+   pneum_chi_invSumm,pneum_earlySumm,pneum_ageDQ_oldSumm,pneum_ageDQSumm)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1549,10 +1554,10 @@ rm(PneumSummaryReport)
 ### COLLATE PNEUMOCOCCAL QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- multi_vacc %>% rbind(pneum_chi_na)
+multi_vacc <- multi_vacc %>% rbind(pneum_chi_inv)
 pneum_vacc <- rbind(pneum_early,pneum_ageDQ)
 
-rm(pneum_chi_na,pneum_early,pneum_ageDQ)
+rm(pneum_chi_inv,pneum_early,pneum_ageDQ)
 
 gc()
 
