@@ -1717,10 +1717,11 @@ for(i in 1:16) {
     summarise(patient_count = n_distinct(patient_derived_upi_number)) 
   
   if (n_distinct(df_all$source_system_patient_id
-                 [df_all$QueryName=="01. Missing CHI number"])>0) {
-    df_summ[1,2] = n_distinct(df_all$source_system_patient_id [df_all$QueryName=="01. Missing CHI number"])
+                 [grepl("01. ",df_all$QueryName)])>0) {
+    df_summ[1,1] = "01. Missing/Invalid CHI number"
+    df_summ[1,2] = n_distinct(df_all$source_system_patient_id [grepl("01. ",df_all$QueryName)])
     }
-  
+  if (grepl("01.",df_summ[2,1])) {rows_delete(df_summ,)}
   df_all <- df_all %>% select(-source_system_patient_id)
   
   if (nrow(df_summ)>0) {
