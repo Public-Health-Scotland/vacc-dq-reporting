@@ -1666,19 +1666,22 @@ pneum_ageDQ_oldSumm <- PneumVaxData %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
   summarise(record_count = n())
 
-### CREATE TABLE OF RECORDS & SUMMARY OF PATIENTS AGED <2 AT VACCINATION
+### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN AGE < 65
+### THAT ARE NOT IN ELIGIBILITY COHORT
 pneum_ageDQ <- PneumVaxData %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
-  filter(age_at_vacc < 2)
+  filter(age_at_vacc < 65 & !is.na(vacc_phase)) %>%
+  left_join(pneum_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(is.na(cohort)) %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "22. PNEUM Vacc given outwith age guidance") 
 
-pneum_ageDQSumm <- pneum_ageDQ %>%
-  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
+pneum_ageDQSumm <- pneum_ageDQ %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name,vacc_data_source,
+           Date_Administered,age_at_vacc,vacc_phase) %>%
   summarise(record_count = n())
 
-pneum_ageDQ <- pneum_ageDQ %>%
-  select(-Date_Administered) %>% 
-  mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "22. PNEUM Age < 2 years") 
+pneum_ageDQ <- pneum_ageDQ %>% select(-c(Date_Administered,cohort:cohort_target_diseases))
 
 ### CREATE & SAVE OUT PNEUMOCOCCAL VACC SUMMARY REPORT
 #############################################################################################
@@ -1692,7 +1695,7 @@ PneumSummaryReport <-
        "Missing or Invalid CHIs" = pneum_chi_invSumm,
        "Interval <5years" = pneum_earlySumm,
        "Multiples Doses Age>65" = pneum_ageDQ_oldSumm,
-       "Vaccine Given to Age<2" = pneum_ageDQSumm)
+       "Vacc Given Outwith Age Guidance" = pneum_ageDQSumm)
 
 rm(PneumVaxData,PneumSystemSummary,pneum_chi_check,pneum_vacc_prodSumm,
    pneum_vacc_cohorts,pneum_chi_invSumm,pneum_earlySumm,pneum_ageDQ_oldSumm,
