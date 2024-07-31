@@ -836,9 +836,7 @@ FluVaxData <- odbc::dbGetQuery(conn, "select
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='Influenza (disorder)'
-                          AND vacc_clinical_trial_flag='0'
-                          AND vacc_occurence_time > ?",
-                         params = reporting_start_date-28)
+                          AND vacc_clinical_trial_flag='0' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
 FluVaxData$vacc_location_name <- textclean::replace_non_ascii(FluVaxData$vacc_location_name,replacement = "")
@@ -1416,9 +1414,7 @@ PneumVaxData <- odbc::dbGetQuery(conn, "select
                         age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
-                          AND vacc_type_target_disease='Pneumococcal infectious disease (disorder)'
-                          AND vacc_occurence_time > ?",
-                           params = reporting_start_date-1825)
+                          AND vacc_type_target_disease='Pneumococcal infectious disease (disorder)' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
 PneumVaxData$vacc_location_name <- textclean::replace_non_ascii(PneumVaxData$vacc_location_name,replacement = "")
