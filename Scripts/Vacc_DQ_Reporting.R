@@ -304,20 +304,29 @@ CovVaxData$vacc_location_name <- textclean::replace_non_ascii(CovVaxData$vacc_lo
 CovVaxData$vacc_performer_name <- textclean::replace_non_ascii(CovVaxData$vacc_performer_name,replacement = "")
 
 ### EXTRACT COVID-19 COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
-cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+cov_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort,
-                                      cohort_source,
-                                      cohort_extract_time,
+                                      # cohort_source,
+                                      # cohort_extract_time,
                                       cohort_reporting_label,
                                       cohort_description,
                                       cohort_target_diseases,
-                                      patient_cohort_created_at,
-                                      patient_cohort_updated_at,
-                                      patient_cohort_removal_datetime,
-                                      patient_cohort_removal_status,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
+                                      # patient_cohort_removal_datetime,
+                                      # patient_cohort_removal_status,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis
             where cohort_target_diseases like '%840539006 - COVID-19%' ")
+
+table(cov_cohort$cohort_description,useNA = "ifany")
+table(cov_cohort$cohort_phase,useNA = "ifany")
+table(cov_cohort$cohort [is.na(cov_cohort$cohort_phase)])
+
+cov_cohort$cohort_phase [cov_cohort$cohort=="NHS_STAFF_2022"] <-
+  "Autumn Winter 2022_23"
+cov_cohort$cohort_phase [cov_cohort$cohort_phase=="Autumn Winter 23_24"] <-
+  "Autumn Winter 2023_24"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 CovVaxData$vacc_record_date <- as.Date(substr(CovVaxData$vacc_record_created_at,1,10))
@@ -348,10 +357,33 @@ CovVaxData$sort_date <- NA
 ### CREATE COVID-19 VACC DATAFRAME BY JOINING COVID VACC EVENT RECORDS WITH PATIENT & COHORT RECORDS
 CovVaxData <- CovVaxData %>%
   inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
-  left_join(cohort, by=("source_system_patient_id")) %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
   select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
+
+### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
+CovVaxData$vacc_phase <- NA
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2020-12-01"),as.Date("2021-08-31"))] <-
+  "Tranche1"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2021-09-01"),as.Date("2022-03-31"))] <-
+  "Tranche2"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2022-04-01"),as.Date("2022-08-31"))] <-
+  "COVID Spring Booster 2022"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2022-09-01"),as.Date("2023-03-31"))] <-
+  "Autumn Winter 2022_23"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2023-04-01"),as.Date("2023-08-31"))] <-
+  "Spring 2023"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2023-09-01"),as.Date("2024-03-31"))] <-
+  "Autumn Winter 2023_24"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2024-04-01"),as.Date("2024-08-31"))] <-
+  "Spring 2024"
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -374,6 +406,13 @@ cov_vacc_doseSumm <- CovVaxData %>%
            vacc_occurence_time >= "2024-04-01") %>% 
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_dose_number,
            vacc_booster) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC COHORTS - TRY TO INDICATE IF ONE COHORT OR MORE PER PERSON
+cov_vacc_cohorts <- CovVaxData %>% 
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, cohort, vacc_phase) %>%
   summarise(record_count = n()) 
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
@@ -775,6 +814,7 @@ cov_SummaryReport <-
        "CHI Check" = cov_chi_check,
        "Vacc Product Type" = cov_vacc_prodSumm,
        "Dose Given After 01.04.2024" = cov_vacc_doseSumm,
+       "Vacc Cohorts" = cov_vacc_cohorts,
        "Missing or Invalid CHIs" = cov_chi_invSumm,
        "2 or More First Doses" = cov_dose1x2Summ,
        "2 or More Second Doses" = cov_dose2x2Summ,
@@ -789,11 +829,11 @@ cov_SummaryReport <-
        "Dose 1 and booster, no dose 2" = cov_dose1andboosterSumm)
 
 rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
-   cov_vacc_doseSumm,cov_chi_invSumm,
+   cov_vacc_doseSumm,cov_vacc_cohorts,cov_chi_invSumm,
    cov_dose1x2Summ,cov_dose2x2Summ,cov_dose3x2Summ,cov_dose4x2Summ,cov_booster_intervalDQSumm,
    cov_age12Summ,cov_under12fulldoseSumm,cov_over11_under5_childdoseSumm,
    cov_over4_infant_doseSumm,cov_dose2nodose1Summ,cov_dose1andboosterSumm,
-   cov_dose1,cov_dose2,cov_dose3,cov_dose4,cov_booster)
+   cov_dose1,cov_dose2,cov_dose3,cov_dose4,cov_booster,cov_cohort)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -853,13 +893,32 @@ FluVaxData <- odbc::dbGetQuery(conn, "select
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='Influenza (disorder)'
-                          AND vacc_clinical_trial_flag='0'
-                          AND vacc_occurence_time > ?",
-                         params = reporting_start_date-28)
+                          AND vacc_clinical_trial_flag='0' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
 FluVaxData$vacc_location_name <- textclean::replace_non_ascii(FluVaxData$vacc_location_name,replacement = "")
 FluVaxData$vacc_performer_name <- textclean::replace_non_ascii(FluVaxData$vacc_performer_name,replacement = "")
+
+### EXTRACT SHINGLES COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
+flu_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+                                      cohort,
+                                      # cohort_reporting_label,
+                                      cohort_description,
+                                      cohort_target_diseases,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
+                                      cohort_phase
+                          from vaccination.vaccination_patient_cohort_analysis
+            where cohort_target_diseases like '%Influenza%' ")
+
+table(flu_cohort$cohort_description,useNA = "ifany")
+table(flu_cohort$cohort_phase,useNA = "ifany")
+table(flu_cohort$cohort [is.na(flu_cohort$cohort_phase)])
+
+flu_cohort$cohort_phase [flu_cohort$cohort=="NHS_STAFF_2022"] <-
+  "Autumn Winter 2022_23"
+flu_cohort$cohort_phase [flu_cohort$cohort_phase=="Autumn Winter 23_24"] <-
+  "Autumn Winter 2023_24"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 FluVaxData$vacc_record_date <- as.Date(substr(FluVaxData$vacc_record_created_at,1,10))
@@ -893,6 +952,18 @@ FluVaxData <- FluVaxData %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
+### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
+FluVaxData$vacc_phase <- NA
+FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
+                               as.Date("2021-09-01"),as.Date("2022-03-31"))] <-
+  "Tranche2"
+FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
+                               as.Date("2022-09-01"),as.Date("2023-03-31"))] <-
+  "Autumn Winter 2022_23"
+FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
+                               as.Date("2023-09-01"),as.Date("2024-03-31"))] <-
+  "Autumn Winter 2023_24"
+
 ### CREATE FLU VACCINATIONS DQ QUERIES
 #############################################################################################
 
@@ -906,6 +977,13 @@ flu_chi_check <- FluVaxData %>%
 flu_vacc_prodSumm <- FluVaxData %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC COHORTS
+flu_vacc_cohorts <- FluVaxData %>% 
+  left_join(flu_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, cohort, vacc_phase) %>%
   summarise(record_count = n()) 
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
@@ -943,7 +1021,7 @@ flu_earlySumm <- flu_early %>% group_by(vacc_location_health_board_name,vacc_loc
 
 flu_early <- flu_early %>% select(-Date_Administered)
 
-### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATION GIVEN AT AGE <2 OR >17
+### CREATE TABLE OF RECORDS & SUMMARY OF FLUENZ VACCINATION GIVEN AT AGE <2 OR >17
 flu_fluenz_ageDQ <- FluVaxData %>%
   filter(vacc_product_name == "Fluenz Tetra Vaccine AstraZeneca") %>%
   filter(age_at_vacc < 2 | age_at_vacc > 17) %>% 
@@ -965,13 +1043,15 @@ flu_SummaryReport <-
   list("System Summary" = FluSystemSummary,
        "CHI Check" = flu_chi_check,
        "Vacc Product Type" = flu_vacc_prodSumm,
+       "Vacc Cohorts" = flu_vacc_cohorts,
        "Missing or Invalid CHIs" = flu_chi_invSumm,
        "Interval < 4 weeks" =  flu_intervalSumm,
        "Vaccine before 06.09.2021" = flu_earlySumm,
        "Fluenz Given to Aged <2 or >17" = flu_fluenz_ageDQSumm)
 
-rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_chi_invSumm,
-   flu_intervalSumm,flu_earlySumm,flu_fluenz_ageDQSumm)
+rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_vacc_cohorts,
+   flu_chi_invSumm,flu_intervalSumm,flu_earlySumm,flu_fluenz_ageDQSumm,
+   flu_cohort)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1033,6 +1113,22 @@ HZVaxData <- odbc::dbGetQuery(conn, "select
 HZVaxData$vacc_location_name <- textclean::replace_non_ascii(HZVaxData$vacc_location_name,replacement = "")
 HZVaxData$vacc_performer_name <- textclean::replace_non_ascii(HZVaxData$vacc_performer_name,replacement = "")
 
+### EXTRACT SHINGLES COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
+hz_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+                                      cohort,
+                                      # cohort_reporting_label,
+                                      cohort_description,
+                                      cohort_target_diseases,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
+                                      cohort_phase
+                          from vaccination.vaccination_patient_cohort_analysis
+            where cohort_target_diseases like '%Herpes zoster%' ")
+
+table(hz_cohort$cohort_target_diseases, useNA = "ifany")
+table(hz_cohort$cohort_phase, useNA = "ifany")
+table(hz_cohort$cohort, useNA = "ifany")
+
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 HZVaxData$vacc_record_date <- as.Date(substr(HZVaxData$vacc_record_created_at,1,10))
 HZVaxData$days_between_vacc_and_recording <- as.double(difftime(HZVaxData$vacc_record_date,HZVaxData$vacc_occurence_time,units="days"))
@@ -1065,6 +1161,15 @@ HZVaxData <- HZVaxData %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
+### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
+HZVaxData$vacc_phase <- NA
+HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
+                              as.Date("2022-09-01"),as.Date("2023-08-31"))] <-
+  "Scottish Immunisation Programme"
+HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
+                              as.Date("2023-09-01"),as.Date("2024-08-31"))] <-
+  "Sept23_Aug24"
+
 ### CREATE SHINGLES VACCINATIONS DQ QUERIES
 #############################################################################################
 
@@ -1078,6 +1183,13 @@ hz_chi_check <- HZVaxData %>%
 hz_vacc_prodSumm <- HZVaxData %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC COHORTS
+hz_vacc_cohorts <- HZVaxData %>% 
+  left_join(hz_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, cohort, vacc_phase) %>%
   summarise(record_count = n()) 
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
@@ -1323,7 +1435,7 @@ hz_zostavax_errorSumm <- hz_zostavax_error %>%
 hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
-### NOTE THAT THIS QUERY DOES NOT CONSIDER IMMUNOCOMPROMISED PATIENTS
+### THAT ARE NOT IN SIS ELIGIBILITY COHORT
 
 # patients not aged 70-79 on 1st Sep 2021 and vaccinated 2021-22
 hz_ageDQ1 <- HZVaxData %>% 
@@ -1333,7 +1445,7 @@ hz_ageDQ1 <- HZVaxData %>%
 # patients not aged 70-79 on 1st Sep 2022 and vaccinated 2022-23
 hz_ageDQ2 <- HZVaxData %>%
   filter(between(vacc_occurence_time,as.Date("2022-09-01"),as.Date("2023-08-31")) &
-           !between(patient_date_of_birth,as.Date("1942-09-02"),as.Date("1952-09-01")))         
+           !between(patient_date_of_birth,as.Date("1942-09-02"),as.Date("1952-09-01")))
 
 # patients not aged 65 or 70-79 on 1st Sep 2023 and vaccinated 2023-24
 hz_ageDQ3 <- HZVaxData %>%
@@ -1341,8 +1453,11 @@ hz_ageDQ3 <- HZVaxData %>%
            !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
            !between(patient_date_of_birth,as.Date("1943-09-02"),as.Date("1953-09-01")))         
 
+# combine 3 ageDQ dfs and remove anyone in eligibility cohorts
 hz_ageDQ <- rbind(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3) %>%
-  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  left_join(hz_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(vacc_event_created_at >= reporting_start_date &
+           is.na(cohort)) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "20. HZ Vacc given outwith age guidance") 
 
@@ -1352,7 +1467,7 @@ hz_ageDQSumm <- hz_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
   summarise(record_count = n())
 
-hz_ageDQ <- hz_ageDQ %>% select(-Date_Administered)
+hz_ageDQ <- hz_ageDQ %>% select(-c(Date_Administered,cohort:cohort_target_diseases))
 
 ### CREATE & SAVE OUT SHINGLES VACC SUMMARY REPORT
 #############################################################################################
@@ -1362,6 +1477,7 @@ HZSummaryReport <-
   list("System Summary" = HZSystemSummary,
        "CHI Check" = hz_chi_check,
        "Vacc Product Type" = hz_vacc_prodSumm,
+       "Vacc Cohorts" = hz_vacc_cohorts,
        "Missing or Invalid CHIs" = hz_chi_invSumm,
        "2 or More First Doses" = hz_dose1x2Summ,
        "2 or More Second Doses" = hz_dose2x2Summ,
@@ -1372,10 +1488,10 @@ HZSummaryReport <-
        "Zostavax given after 01.09.2023" = hz_zostavax_errorSumm,
        "Vacc outwith age guidance" = hz_ageDQSumm)
 
-rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_chi_invSumm,
-   hz_dose1x2Summ,hz_dose2x2Summ,hz_dose2_ZostSumm,hz_dose2_earlySumm,
-   hz_wrongvaxtypeSumm,hz_dose2_nodose1Summ,hz_zostavax_errorSumm,hz_ageDQSumm,
-   hz_dose1,hz_dose2)
+rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_vacc_cohorts,
+   hz_chi_invSumm,hz_dose1x2Summ,hz_dose2x2Summ,hz_dose2_ZostSumm,
+   hz_dose2_earlySumm,hz_wrongvaxtypeSumm,hz_dose2_nodose1Summ,
+   hz_zostavax_errorSumm,hz_ageDQSumm,hz_dose1,hz_dose2,hz_cohort)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1433,13 +1549,27 @@ PneumVaxData <- odbc::dbGetQuery(conn, "select
                         age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
-                          AND vacc_type_target_disease='Pneumococcal infectious disease (disorder)'
-                          AND vacc_occurence_time > ?",
-                           params = reporting_start_date-1825)
+                          AND vacc_type_target_disease='Pneumococcal infectious disease (disorder)' ")
 
 ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
 PneumVaxData$vacc_location_name <- textclean::replace_non_ascii(PneumVaxData$vacc_location_name,replacement = "")
 PneumVaxData$vacc_performer_name <- textclean::replace_non_ascii(PneumVaxData$vacc_performer_name,replacement = "")
+
+### EXTRACT SHINGLES COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
+pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+                                      cohort,
+                                      # cohort_reporting_label,
+                                      cohort_description,
+                                      cohort_target_diseases,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
+                                      cohort_phase
+                          from vaccination.vaccination_patient_cohort_analysis
+            where cohort_target_diseases like '%Pneumococcal%' ")
+
+table(pneum_cohort$cohort_target_diseases, useNA = "ifany")
+table(pneum_cohort$cohort_phase, useNA = "ifany")
+table(pneum_cohort$cohort, useNA = "ifany")
 
 ### CALCULATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 PneumVaxData$vacc_record_date <- as.Date(substr(PneumVaxData$vacc_record_created_at,1,10))
@@ -1473,6 +1603,12 @@ PneumVaxData <- PneumVaxData %>%
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
+### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
+PneumVaxData$vacc_phase <- NA
+PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
+                                 as.Date("2024-04-01"),as.Date("2025-03-31"))] <-
+  "Apr24_Mar25"
+
 ### CREATE PNEUOMOCOCCAL VACCINATIONS DQ QUERIES
 #############################################################################################
 
@@ -1486,6 +1622,13 @@ pneum_chi_check <- PneumVaxData %>%
 pneum_vacc_prodSumm <- PneumVaxData %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC COHORTS
+pneum_vacc_cohorts <- PneumVaxData %>% 
+  left_join(pneum_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, cohort, vacc_phase) %>%
   summarise(record_count = n()) 
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
@@ -1545,13 +1688,15 @@ PneumSummaryReport <-
   list("System Summary" = PneumSystemSummary,
        "CHI Check" = pneum_chi_check,
        "Vacc Product Type" = pneum_vacc_prodSumm,
+       "Vacc Cohorts" = pneum_vacc_cohorts,
        "Missing or Invalid CHIs" = pneum_chi_invSumm,
        "Interval <5years" = pneum_earlySumm,
        "Multiples Doses Age>65" = pneum_ageDQ_oldSumm,
        "Vaccine Given to Age<2" = pneum_ageDQSumm)
 
 rm(PneumVaxData,PneumSystemSummary,pneum_chi_check,pneum_vacc_prodSumm,
-   pneum_chi_invSumm,pneum_earlySumm,pneum_ageDQ_oldSumm,pneum_ageDQSumm)
+   pneum_vacc_cohorts,pneum_chi_invSumm,pneum_earlySumm,pneum_ageDQ_oldSumm,
+   pneum_ageDQSumm,pneum_cohort)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1704,15 +1849,14 @@ pneum_vacc <- pneum_vacc %>% arrange(desc(sort_date),DQ_ID,desc(vacc_event_creat
 ### CREATE A DATA TABLE OF ALL DATA QUERY RECORDS FOR HB REPORTS
 all_queries <- rbind(multi_vacc,covid_vacc,flu_vacc,hz_vacc,pneum_vacc) %>% 
   arrange(desc(sort_date),DQ_ID,desc(vacc_event_created_at)) %>% 
-  select(-sort_date)
+  select(-sort_date,-vacc_phase)
 
 ### FINALISE DATA TABLES FOR HB REPORTS
-multi_vacc <- multi_vacc %>% select(-source_system_patient_id,-sort_date)
-covid_vacc <- covid_vacc %>% select(-source_system_patient_id,-sort_date)
-flu_vacc <- flu_vacc %>% select(-source_system_patient_id,-sort_date)
-hz_vacc <- hz_vacc %>% select(-source_system_patient_id,-sort_date)
-pneum_vacc <- pneum_vacc %>% select(-source_system_patient_id,-sort_date)
-
+multi_vacc <- multi_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
+covid_vacc <- covid_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
+flu_vacc <- flu_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
+hz_vacc <- hz_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
+pneum_vacc <- pneum_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
 
 ########################################################################
 ################################ SECTION F #############################
