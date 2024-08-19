@@ -1123,11 +1123,16 @@ hz_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_updated_at,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis
-            where cohort_target_diseases like '%Herpes zoster%' ")
+            where cohort like '%SHINGLES%' ")
 
 table(hz_cohort$cohort_target_diseases, useNA = "ifany")
 table(hz_cohort$cohort_phase, useNA = "ifany")
 table(hz_cohort$cohort, useNA = "ifany")
+
+hz_cohort$cohort_phase [is.na(hz_cohort$cohort_target_diseases)] <-
+  "Sept21_Aug22"
+hz_cohort$cohort_phase [hz_cohort$cohort_phase=="Scottish Immunisation Programme"] <-
+  "Sept22_Aug23"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 HZVaxData$vacc_record_date <- as.Date(substr(HZVaxData$vacc_record_created_at,1,10))
@@ -1162,10 +1167,13 @@ HZVaxData <- HZVaxData %>%
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
 ### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
-HZVaxData$vacc_phase <- NA
+HZVaxData$vacc_phase <- NA 
+HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
+                              as.Date("2021-09-01"),as.Date("2022-08-31"))] <-
+  "Sept21_Aug22"
 HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2022-09-01"),as.Date("2023-08-31"))] <-
-  "Scottish Immunisation Programme"
+  "Sept22_Aug23"
 HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2023-09-01"),as.Date("2024-08-31"))] <-
   "Sept23_Aug24"
@@ -1439,17 +1447,17 @@ hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered)
 
 # patients not aged 70-79 on 1st Sep 2021 and vaccinated 2021-22
 hz_ageDQ1 <- HZVaxData %>% 
-  filter(between(vacc_occurence_time,as.Date("2021-09-01"),as.Date("2022-08-31")) &
+  filter(vacc_phase=="Sept21_Aug22" &
            !between(patient_date_of_birth,as.Date("1941-09-02"),as.Date("1951-09-01")))         
 
 # patients not aged 70-79 on 1st Sep 2022 and vaccinated 2022-23
 hz_ageDQ2 <- HZVaxData %>%
-  filter(between(vacc_occurence_time,as.Date("2022-09-01"),as.Date("2023-08-31")) &
+  filter(vacc_phase=="Sept22_Aug23" &
            !between(patient_date_of_birth,as.Date("1942-09-02"),as.Date("1952-09-01")))
 
 # patients not aged 65 or 70-79 on 1st Sep 2023 and vaccinated 2023-24
 hz_ageDQ3 <- HZVaxData %>%
-  filter(between(vacc_occurence_time,as.Date("2023-09-01"),as.Date("2024-08-31")) &
+  filter(vacc_phase=="Sept23_Aug24" &
            !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
            !between(patient_date_of_birth,as.Date("1943-09-02"),as.Date("1953-09-01")))         
 
@@ -1555,7 +1563,7 @@ PneumVaxData <- odbc::dbGetQuery(conn, "select
 PneumVaxData$vacc_location_name <- textclean::replace_non_ascii(PneumVaxData$vacc_location_name,replacement = "")
 PneumVaxData$vacc_performer_name <- textclean::replace_non_ascii(PneumVaxData$vacc_performer_name,replacement = "")
 
-### EXTRACT SHINGLES COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
+### EXTRACT PNEUMOCOCCAL COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
 pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort,
                                       # cohort_reporting_label,
@@ -1563,13 +1571,17 @@ pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort_target_diseases,
                                       # patient_cohort_created_at,
                                       # patient_cohort_updated_at,
-                                      cohort_phase
+                                      cohort_phase,
+                                      cohort_extract_time
                           from vaccination.vaccination_patient_cohort_analysis
-            where cohort_target_diseases like '%Pneumococcal%' ")
+            where cohort like '%PNEUMOCOCCAL%' ")
 
 table(pneum_cohort$cohort_target_diseases, useNA = "ifany")
 table(pneum_cohort$cohort_phase, useNA = "ifany")
 table(pneum_cohort$cohort, useNA = "ifany")
+
+pneum_cohort$cohort_phase [pneum_cohort$cohort_phase=="Scottish Immunisation Programme"] <- 
+  "Jan23_Mar24"
 
 ### CALCULATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 PneumVaxData$vacc_record_date <- as.Date(substr(PneumVaxData$vacc_record_created_at,1,10))
@@ -1605,6 +1617,9 @@ PneumVaxData <- PneumVaxData %>%
 
 ### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
 PneumVaxData$vacc_phase <- NA
+PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
+                                 as.Date("2023-01-01"),as.Date("2024-03-31"))] <-
+  "Jan23_Mar24"
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2024-04-01"),as.Date("2025-03-31"))] <-
   "Apr24_Mar25"
