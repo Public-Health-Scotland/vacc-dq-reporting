@@ -17,16 +17,16 @@
 #
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-library(dplyr)
+# library(dplyr)
 
 reporting_start_date = as.Date("2021-01-01")
 answer <- 0
 
-### ESTABLISH ODBC CONNECTION TO DVPROD MANUALLY
-conn <- odbc::dbConnect(odbc::odbc(),
-                        dsn = "DVPROD", 
-                        uid = paste(Sys.info()['user']),
-                        pwd = .rs.askForPassword("password"))
+# ### ESTABLISH ODBC CONNECTION TO DVPROD MANUALLY
+# conn <- odbc::dbConnect(odbc::odbc(),
+#                         dsn = "DVPROD", 
+#                         uid = paste(Sys.info()['user']),
+#                         pwd = .rs.askForPassword("password"))
 
 # ### LOOK UP RSV COHORTS IN VDL
 # cohort_summ <- conn %>%
@@ -47,26 +47,26 @@ conn <- odbc::dbConnect(odbc::odbc(),
 # 
 # table(cohort_summ$cohort_target_diseases)
 # 
-### EXTRACT PATIENT DATA VARIABLES IN vaccination_patient_analysis VIEW
-Vaxpatientraw <- odbc::dbGetQuery(conn, "select 
-                            source_system_patient_id,
-                            patient_derived_chi_number,
-                            patient_derived_upi_number,
-                            patient_given_name,
-                            patient_family_name,
-                            patient_date_of_birth,
-                            patient_sex,
-                            source_system_gp_practice_code,
-                            source_system_gp_practice_text,
-                            patient_chi_derived_status_desc,
-                            patient_nrs_date_of_death,
-                            patient_chi_temporary_resident_flag,
-                            patient_chi_transfer_out_flag
-                            from vaccination.vaccination_patient_analysis ")
-
-### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN PATIENT ANALYSIS DATA
-Vaxpatientraw$patient_family_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_family_name,replacement = "")
-Vaxpatientraw$patient_given_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_given_name,replacement = "")
+# ### EXTRACT PATIENT DATA VARIABLES IN vaccination_patient_analysis VIEW
+# Vaxpatientraw <- odbc::dbGetQuery(conn, "select 
+#                             source_system_patient_id,
+#                             patient_derived_chi_number,
+#                             patient_derived_upi_number,
+#                             patient_given_name,
+#                             patient_family_name,
+#                             patient_date_of_birth,
+#                             patient_sex,
+#                             source_system_gp_practice_code,
+#                             source_system_gp_practice_text,
+#                             patient_chi_derived_status_desc,
+#                             patient_nrs_date_of_death,
+#                             patient_chi_temporary_resident_flag,
+#                             patient_chi_transfer_out_flag
+#                             from vaccination.vaccination_patient_analysis ")
+# 
+# ### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN PATIENT ANALYSIS DATA
+# Vaxpatientraw$patient_family_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_family_name,replacement = "")
+# Vaxpatientraw$patient_given_name <- textclean::replace_non_ascii(Vaxpatientraw$patient_given_name,replacement = "")
 
 ### CHECK VACC TARGET DISEASES IN VDL FOR EXACT RSV NAME
 Vaxeventtot <- conn %>%
@@ -80,7 +80,7 @@ Vaxeventtot <- conn %>%
 
 # unique(Vaxeventtot$vacc_type_target_disease)
 # 
-### ADD vacc_type_target_disease FROM TABLE PRODUCED ABOVE TO CREATE SUMMARY
+### CREATE SUMMARY TABLE OF RSV VACC RECORDS
 rsv_system_summary <- Vaxeventtot %>%
   filter(vacc_type_target_disease == "Respiratory syncytial virus infection (disorder)") %>% # &
            # vacc_event_created_at>=reporting_start_date) %>% 
@@ -123,8 +123,8 @@ rsv_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort_reporting_label,
                                       cohort_description,
                                       cohort_target_diseases,
-                                      patient_cohort_created_at,
-                                      patient_cohort_updated_at,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
                                       # patient_cohort_removal_datetime,
                                       # patient_cohort_removal_status,
                                       cohort_phase
@@ -210,16 +210,6 @@ rsv_vacc_cohorts <- rsv_vacc %>%
 rsv_dose_number <- rsv_vacc %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   group_by(vacc_location_health_board_name,vacc_dose_number,vacc_booster) %>%
-  summarise(record_count = n()) 
-
-### CREATE SUMMARY TABLE OF BOOSTER DOSES
-rsv_booster <- rsv_vacc %>% 
-  filter(vacc_event_created_at >= reporting_start_date &
-           vacc_booster=="TRUE")
-
-rsv_boosterSumm <- rsv_booster %>% 
-  group_by(vacc_location_health_board_name,vacc_location_name,
-           vacc_dose_number,vacc_booster,vacc_occurence_time) %>%
   summarise(record_count = n()) 
 
 ### CREATE SUMMARY TABLE OF VACC OCCURENCE DATES
@@ -318,57 +308,59 @@ rsv_dose1x2Summ <- rsv_dose1x2 %>%
 
 rsv_dose1x2 <- rsv_dose1x2 %>% select(-Date_Administered)
 
-### CREATE SUMMARY TABLE OF AGE & SEX OF NON-COHORT VACCINATIONS
-rsv_age_sex <- rsv_vacc %>%
-  left_join(rsv_cohort,by="source_system_patient_id") %>% 
+### CREATE SUMMARY TABLE OF BOOSTER DOSES
+rsv_booster <- rsv_vacc %>% 
   filter(vacc_event_created_at >= reporting_start_date &
-           is.na(cohort))
+           vacc_booster=="TRUE") %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "03. RSV Booster Recorded") %>% 
+  select(-Date_Administered)
 
-rsv_age_sexSumm <- rsv_age_sex %>% 
+rsv_boosterSumm <- rsv_booster %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name,
+           vacc_dose_number,vacc_booster,vacc_occurence_time) %>%
+  summarise(record_count = n()) 
+
+# ### CREATE SUMMARY TABLE OF AGE & SEX OF NON-COHORT VACCINATIONS
+# rsv_age_sex <- rsv_vacc %>%
+#   left_join(rsv_cohort,by="source_system_patient_id") %>% 
+#   filter(vacc_event_created_at >= reporting_start_date &
+#            is.na(cohort)) %>% 
+#   mutate(sort_date = vacc_event_created_at) %>% 
+#   mutate(QueryName = "04. RSV Non-cohort vacc") %>% 
+#   select(-c(Date_Administered,cohort:cohort_phase))
+# 
+# rsv_age_sexSumm <- rsv_age_sex %>% 
+#   group_by(vacc_location_health_board_name, age_at_vacc, patient_sex) %>%
+#   summarise(record_count = n())
+# 
+# ### EXTRACT COMPLETED RSV VACC RECORDS IN vaccination_event_analysis VIEW
+# rsv_vacc_mat <- odbc::dbGetQuery(conn, "select *
+#                         from vaccination.vaccination_event_analysis
+#                         WHERE vacc_status='completed' 
+#                           AND vacc_type_target_disease='Respiratory syncytial virus infection (disorder)'
+#                           AND vacc_location_name='V6800 - FVRH W&C Maternity' ")
+
+### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
+### THAT ARE NOT IN AGE-RELATED ELIGIBILITY COHORT
+
+# patients not aged 74-79 on 1st Aug 2024 and vaccinated 2024-25
+rsv_non_cohort <- rsv_vacc %>%
+  filter(vacc_phase=="Aug24_Jul25" &
+           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31"))) %>% 
+  left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(vacc_event_created_at >= reporting_start_date &
+           is.na(cohort)) %>%  
+  mutate(sort_date = vacc_event_created_at) %>%
+  mutate(QueryName = "04. RSV Non-cohort vacc age>55")
+  
+rsv_non_cohortSumm <- rsv_non_cohort %>% 
   group_by(vacc_location_health_board_name, age_at_vacc, patient_sex) %>%
   summarise(record_count = n())
 
-### EXTRACT COMPLETED RSV VACC RECORDS IN vaccination_event_analysis VIEW
-rsv_vacc_mat <- odbc::dbGetQuery(conn, "select *
-                        from vaccination.vaccination_event_analysis
-                        WHERE vacc_status='completed' 
-                          AND vacc_type_target_disease='Respiratory syncytial virus infection (disorder)'
-                          AND vacc_location_name='V6800 - FVRH W&C Maternity' ")
-
-# ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
-# ### THAT ARE NOT IN AGE-RELATED ELIGIBILITY COHORT
-# 
-# # patients not turning 75 from 1st Aug 2024 to 31st July 2025 and vaccinated 2024-25
-# rsv_ageDQ1 <- rsv_vacc %>% 
-#   filter(between(vacc_occurence_time,as.Date("2024-08-01"),as.Date("2025-07-31")) &
-#            !between(patient_date_of_birth,as.Date("1949-08-01"),as.Date("1950-07-31")))         
-# 
-# # patients not aged 75-79 on 1st Aug 2024 and vaccinated 2024-25
-# rsv_ageDQ2 <- rsv_vacc %>%
-#   filter(between(vacc_occurence_time,as.Date("2024-08-01"),as.Date("2025-07-31")) &
-#            !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1949-08-01")))
-# 
-# # patients not turning 80 from 1st Aug 2024 to 31st July 2025 and vaccinated 2024-25
-# rsv_ageDQ3 <- rsv_vacc %>% 
-#   filter(between(vacc_occurence_time,as.Date("2024-08-01"),as.Date("2025-07-31")) &
-#            !between(patient_date_of_birth,as.Date("1944-08-01"),as.Date("1945-07-31")))         
-# 
-# # combine 3 ageDQ dfs and remove anyone in eligibility cohorts
-# rsv_ageDQ <- rbind(rsv_ageDQ1,rsv_ageDQ2,rsvz_ageDQ3) %>%
-#   left_join(cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
-#   filter(vacc_event_created_at >= reporting_start_date &
-#            is.na(cohort) &
-#            (!between(age_at_vacc,15,55) | patient_sex=="MALE")) %>% 
-#   mutate(sort_date = vacc_event_created_at) %>% 
-#   mutate(QueryName = "03. RSV Vacc given outwith cohorts") 
-# 
-# rm(rsv_ageDQ1,rsv_ageDQ2,rsv_ageDQ3)
-# 
-# rsv_ageDQSumm <- rsv_ageDQ %>%
-#   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
-#   summarise(record_count = n())
-# 
-# rsv_ageDQ <- rsv_ageDQ %>% select(-c(Date_Administered:cohort_target_diseases))
+rsv_non_cohort <- rsv_non_cohort %>%
+  filter(age_at_vacc>55) %>% 
+  select(-c(Date_Administered,cohort:cohort_target_diseases))
 
 ### CREATE & SAVE OUT RSV VACC SUMMARY REPORT
 #############################################################################################
@@ -385,22 +377,88 @@ rsv_summary_report <-
        "Vacc ISO Weeks" = rsv_vacc_iso,
        "Missing or Invalid CHIs" = rsv_chi_invSumm,
        "2 or More First Doses" = rsv_dose1x2Summ,
-       "Patient Age, Sex - Non-Cohort" = rsv_age_sex)
+       "Non-Cohort by age, sex" = rsv_non_cohortSumm)
 
 # rm()
 
 #Saves out collated tables into an excel file
 if (answer==1) {
   openxlsx::write.xlsx(rsv_summary_report,
-             paste("RSV_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+             paste("Outputs/RSV/DQ Summary Reports/RSV_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
 } else {
   openxlsx::write.xlsx(rsv_summary_report,
-             paste("RSV_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+             paste("Outputs/RSV/DQ Summary Reports/RSV_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
              asTable = TRUE,
              colWidths = "auto")
 }
 
-rm(rsv_summary_report)
+# rm(rsv_summary_report)
+
+### COLLATE SHINGLES QUERIES FOR VACCINATIONS DQ REPORT
+rsv_vacc <- rbind(rsv_chi_inv,rsv_dose1x2,rsv_booster,rsv_non_cohort)
+
+### CREATE UNIQUE DQ ID FOR ALL RECORDS IN multi_vacc TABLE
+rsv_vacc$DQ_ID <- paste(substr(rsv_vacc$QueryName,1,2),
+                        rsv_vacc$vacc_source_system_event_id,
+                          substr(rsv_vacc$vacc_event_created_at,1,10),sep = ".")
+
+### UPDATE DQ ID FOR DUPLICATE DOSE 1 QUERY
+d1ID <- rsv_vacc %>% filter(grepl("02.",rsv_vacc$QueryName)) %>% 
+  group_by(patient_derived_upi_number) %>% 
+  summarise(DQ_ID = first(DQ_ID)) %>% 
+  rename("maind1DQID" = DQ_ID)
+
+rsv_vacc <- rsv_vacc %>% left_join(d1ID,by="patient_derived_upi_number")
+
+rsv_vacc$DQ_ID <- ifelse(grepl("02.",rsv_vacc$QueryName),rsv_vacc$maind1DQID,rsv_vacc$DQ_ID)
+
+### TIDY UP rsv_vacc DATA TABLE
+rsv_vacc <- rsv_vacc %>% arrange(desc(sort_date),DQ_ID,desc(vacc_event_created_at)) %>% 
+  select(QueryName,DQ_ID,patient_derived_chi_number,patient_derived_upi_number,
+         everything(),-maind1DQID)
+
+rm(d1ID)
+
+### FINALISE DATA TABLE FOR HB REPORTS
+rsv_vacc <- rsv_vacc %>% select(-sort_date,-vacc_phase)
+
+### CREATE DQ OUTPUTS FOR EACH HEALTH BOARD AND SAVE TO FOLDERS
+for(i in 1:14) {
+  
+  df_rsv <- rsv_vacc %>% filter(vacc_location_health_board_name == hb_name[i])
+
+  df_summ <- df_rsv %>% group_by(QueryName) %>% 
+    summarise(patient_count = n_distinct(patient_derived_upi_number)) 
+  
+  if (n_distinct(df_rsv$source_system_patient_id
+                 [grepl("01. ",df_rsv$QueryName)])>0) {
+    df_summ[1,1] = "01. Missing/Invalid CHI number"
+    df_summ[1,2] = n_distinct(df_rsv$source_system_patient_id [grepl("01. ",df_rsv$QueryName)])
+  }
+  if (grepl("01.",df_summ[2,1])) {df_summ <- df_summ[-2,]}
+  
+  df_rsv <- df_rsv %>% select(-source_system_patient_id)
+  
+  if (nrow(df_summ)>0) {
+    
+    HBReport <-
+      list("Summary" = df_summ,
+           "RSV Vacc - Q01-04" = df_rsv)
+    
+    HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
+    setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
+    setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
+
+    insertImage(HBReportWB,sheet = 1,file = "Scripts/RSV Vacc HB DQ Summary.jpg",
+                width = 10,height = 4.4,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
+    
+    saveWorkbook(HBReportWB,paste("Outputs/RSV/",hb_cypher[i],"_RSV_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
+    
+    rm(HBReport,HBReportWB)
+  } else {
+    writexl::write_xlsx(df_summ,paste("Outputs/RSV/",hb_cypher[i],"_NULL_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""))
+  }
+}
 
