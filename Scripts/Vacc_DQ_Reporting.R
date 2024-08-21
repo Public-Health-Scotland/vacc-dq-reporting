@@ -384,6 +384,9 @@ CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
 CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
                                as.Date("2024-04-01"),as.Date("2024-08-31"))] <-
   "Spring 2024"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2024-09-01"),as.Date("2025-03-31"))] <-
+  "Autumn Winter 2024_25"
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -963,6 +966,10 @@ FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
 FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
                                as.Date("2023-09-01"),as.Date("2024-03-31"))] <-
   "Autumn Winter 2023_24"
+FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
+                               as.Date("2024-09-01"),as.Date("2025-03-31"))] <-
+  "Autumn Winter 2024_25"
+
 
 ### CREATE FLU VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1571,8 +1578,7 @@ pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort_target_diseases,
                                       # patient_cohort_created_at,
                                       # patient_cohort_updated_at,
-                                      cohort_phase,
-                                      cohort_extract_time
+                                      cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis
             where cohort like '%PNEUMOCOCCAL%' ")
 
