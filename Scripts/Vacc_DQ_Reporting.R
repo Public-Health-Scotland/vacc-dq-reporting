@@ -316,7 +316,7 @@ cov_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_removal_datetime,
                                       # patient_cohort_removal_status,
                                       cohort_phase
-                          from vaccination.vaccination_patient_cohort_analysis
+                          from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort_target_diseases like '%840539006 - COVID-19%' ")
 
 table(cov_cohort$cohort_description,useNA = "ifany")
@@ -325,7 +325,7 @@ table(cov_cohort$cohort [is.na(cov_cohort$cohort_phase)])
 
 cov_cohort$cohort_phase [cov_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
-cov_cohort$cohort_phase [cov_cohort$cohort_phase=="Autumn Winter 23_24"] <-
+cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2023_24"] <-
   "Autumn Winter 2023_24"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
@@ -911,7 +911,7 @@ flu_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_created_at,
                                       # patient_cohort_updated_at,
                                       cohort_phase
-                          from vaccination.vaccination_patient_cohort_analysis
+                          from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort_target_diseases like '%Influenza%' ")
 
 table(flu_cohort$cohort_description,useNA = "ifany")
@@ -920,7 +920,7 @@ table(flu_cohort$cohort [is.na(flu_cohort$cohort_phase)])
 
 flu_cohort$cohort_phase [flu_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
-flu_cohort$cohort_phase [flu_cohort$cohort_phase=="Autumn Winter 23_24"] <-
+flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2023_24"] <-
   "Autumn Winter 2023_24"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
@@ -1129,7 +1129,7 @@ hz_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_created_at,
                                       # patient_cohort_updated_at,
                                       cohort_phase
-                          from vaccination.vaccination_patient_cohort_analysis
+                          from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort like '%SHINGLES%' ")
 
 table(hz_cohort$cohort_target_diseases, useNA = "ifany")
@@ -1184,6 +1184,9 @@ HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
 HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2023-09-01"),as.Date("2024-08-31"))] <-
   "Sept23_Aug24"
+HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
+                              as.Date("2024-09-01"),as.Date("2025-08-31"))] <-
+  "Sept24_Aug25"
 
 ### CREATE SHINGLES VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1573,13 +1576,14 @@ PneumVaxData$vacc_performer_name <- textclean::replace_non_ascii(PneumVaxData$va
 ### EXTRACT PNEUMOCOCCAL COHORT RECORDS FROM vaccination_patient_cohort_analysis VIEW
 pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       cohort,
-                                      # cohort_reporting_label,
+                                      cohort_extract_time,
+                                      cohort_reporting_label,
                                       cohort_description,
                                       cohort_target_diseases,
                                       # patient_cohort_created_at,
                                       # patient_cohort_updated_at,
                                       cohort_phase
-                          from vaccination.vaccination_patient_cohort_analysis
+                          from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort like '%PNEUMOCOCCAL%' ")
 
 table(pneum_cohort$cohort_target_diseases, useNA = "ifany")
@@ -1624,8 +1628,14 @@ PneumVaxData <- PneumVaxData %>%
 ### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
 PneumVaxData$vacc_phase <- NA
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
+                                 as.Date("2022-04-01"),as.Date("2023-03-31"))] <-
+  "Apr22_Mar23"
+PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2023-01-01"),as.Date("2024-03-31"))] <-
   "Jan23_Mar24"
+PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
+                                 as.Date("2023-04-01"),as.Date("2024-03-31"))] <-
+  "Apr23_Mar24"
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2024-04-01"),as.Date("2025-03-31"))] <-
   "Apr24_Mar25"

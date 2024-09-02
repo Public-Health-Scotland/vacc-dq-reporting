@@ -128,7 +128,7 @@ rsv_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_removal_datetime,
                                       # patient_cohort_removal_status,
                                       cohort_phase
-                          from vaccination.vaccination_patient_cohort_analysis
+                          from vaccination.vaccination_patient_cohort_analysis_audit
 where cohort_target_diseases like '%55735004 - Respiratory syncytial virus infection (disorder)%' ")
 
 table(rsv_cohort$cohort, useNA = "ifany")
