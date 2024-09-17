@@ -28,6 +28,13 @@ answer <- 0
 #                         uid = paste(Sys.info()['user']),
 #                         pwd = .rs.askForPassword("password"))
 
+# ### LIST HEALTH BOARD CODES AND NAMES FOR CREATING HB REPORTS
+# hb_cypher <- c("A","B","Y","F","V","G","N","H","L","S","R","Z","T","W","NWTC","SAS")
+# hb_name <- c("NHS AYRSHIRE & ARRAN","NHS BORDERS","NHS DUMFRIES & GALLOWAY","NHS FIFE",
+#              "NHS FORTH VALLEY","NHS GREATER GLASGOW & CLYDE","NHS GRAMPIAN","NHS HIGHLAND",
+#              "NHS LANARKSHIRE","NHS LOTHIAN","NHS ORKNEY","NHS SHETLAND","NHS TAYSIDE",
+#              "NHS WESTERN ISLES","NATIONAL FACILITY","SCOTTISH AMBULANCE SERVICE")
+
 # ### LOOK UP RSV COHORTS IN VDL
 # cohort_summ <- conn %>%
 #   tbl(dbplyr::in_schema("vaccination", "vaccination_patient_cohort_analysis")) %>% 
@@ -447,7 +454,7 @@ for(i in 1:14) {
       list("Summary" = df_summ,
            "RSV Vacc - Q01-04" = df_rsv)
     
-    HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
+    HBReportWB <- openxlsx::buildWorkbook(HBReport, asTable = TRUE)
     setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
     setColWidths(HBReportWB,sheet = 2,cols = 1,widths = "auto")
 
