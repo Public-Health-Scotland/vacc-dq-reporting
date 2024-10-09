@@ -119,6 +119,9 @@ Vaxeventtot <- conn %>%
            vacc_event_created_at) %>% 
   summarise(number_of_vacc_events = n()) %>% collect()
 
+saveRDS(Vaxeventtot,"Outputs/Temp/Vaxeventtot.rds")
+# Vaxeventtot <- readRDS("Outputs/Temp/Vaxeventtot.rds")
+
 ### CREATE SUMMARY TABLE OF COVID VACC RECORDS
 CovSystemSummary <- Vaxeventtot %>%
   filter(vacc_type_target_disease == "COVID-19" &
@@ -146,6 +149,14 @@ PneumSystemSummary <- Vaxeventtot %>%
            vacc_event_created_at>=reporting_start_date) %>%
   group_by(vacc_status,vacc_type_target_disease,vacc_data_source) %>% 
   summarise(record_count = sum(number_of_vacc_events))
+
+### CREATE SUMMARY TABLE OF RSV VACC RECORDS
+rsv_system_summary <- Vaxeventtot %>%
+  filter(vacc_type_target_disease == "Respiratory syncytial virus infection (disorder)" &
+  vacc_event_created_at>=reporting_start_date) %>%
+  group_by(vacc_status,vacc_type_target_disease,vacc_data_source) %>% 
+  summarise(record_count = sum(number_of_vacc_events))
+
 
 ### UN-HASH AND RUN THE BELOW 2 LINES IF NOT GOING ON TO RUN SECTION B2
 # rm(Vaxeventtot)
@@ -866,6 +877,11 @@ rm(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
 
 gc()
 
+saveRDS(multi_vacc,"Outputs/Temp/multi_vacc.rds")
+# multi_vacc <- readRDS("Outputs/Temp/multi_vacc.rds")
+saveRDS(covid_vacc,"Outputs/Temp/covid_vacc.rds")
+# covid_vacc <- readRDS("Outputs/Temp/covid_vacc.rds")
+
 ########################################################################
 ###############################  SECTION D2 ############################
 ############################  FLU VACCINATIONS #########################
@@ -1084,6 +1100,11 @@ flu_vacc <- rbind(flu_interval,flu_early,flu_fluenz_ageDQ)
 rm(flu_chi_inv,flu_interval,flu_early,flu_fluenz_ageDQ)
 
 gc()
+
+saveRDS(multi_vacc,"Outputs/Temp/multi_vacc.rds")
+# multi_vacc <- readRDS("Outputs/Temp/multi_vacc.rds")
+saveRDS(flu_vacc,"Outputs/Temp/flu_vacc.rds")
+# flu_vacc <- readRDS("Outputs/Temp/flu_vacc.rds")
 
 ########################################################################
 ###############################  SECTION D3 ############################
@@ -1758,6 +1779,294 @@ rm(pneum_chi_inv,pneum_early,pneum_ageDQ)
 gc()
 
 ########################################################################
+###############################  SECTION D5 ############################
+############################  RSV VACCINATIONS #########################
+########################################################################
+
+### CREATE RSV VACCINATIONS DATAFRAME
+##############################################################################
+
+### EXTRACT COMPLETED RSV VACC RECORDS IN vaccination_event_analysis VIEW
+rsv_vacc <- odbc::dbGetQuery(conn, "select 
+                        source_system_patient_id,
+                        patient_derived_encrypted_upi,
+                        vacc_source_system_event_id, 
+                        vacc_type_target_disease,
+                        vacc_event_created_at,
+                        vacc_record_created_at, 
+                        vacc_occurence_time,
+                        vacc_location_health_board_name,
+                        vacc_location_name,
+                        vacc_product_name, 
+                        vacc_batch_number, 
+                        vacc_performer_name,
+                        vacc_dose_number, 
+                        vacc_booster,
+                        vacc_data_source, 
+                        vacc_data_source_display,
+                        age_at_vacc
+                        from vaccination.vaccination_event_analysis
+                        WHERE vacc_status='completed' 
+                          AND vacc_type_target_disease='Respiratory syncytial virus infection (disorder)'
+                          AND vacc_clinical_trial_flag='0' ")
+
+### CLEAN INVALID CHARACTERS FROM FREE-TEXT FIELDS IN EVENT ANALYSIS DATA
+rsv_vacc$vacc_location_name <- textclean::replace_non_ascii(rsv_vacc$vacc_location_name,replacement = "")
+rsv_vacc$vacc_performer_name <- textclean::replace_non_ascii(rsv_vacc$vacc_performer_name,replacement = "")
+
+### EXTRACT RSV COHORT DATA FROM VDL
+rsv_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
+                                      cohort,
+                                      cohort_reporting_label,
+                                      cohort_description,
+                                      cohort_target_diseases,
+                                      # patient_cohort_created_at,
+                                      # patient_cohort_updated_at,
+                                      cohort_phase
+                          from vaccination.vaccination_patient_cohort_analysis_audit
+where cohort_target_diseases like '%55735004 - Respiratory syncytial virus infection (disorder)%' ")
+
+table(rsv_cohort$cohort, useNA = "ifany")
+table(rsv_cohort$cohort_reporting_label, useNA = "ifany")
+table(rsv_cohort$cohort_description, useNA = "ifany")
+table(rsv_cohort$cohort_target_diseases, useNA = "ifany")
+table(rsv_cohort$patient_cohort_created_at, useNA = "ifany")
+table(rsv_cohort$patient_cohort_updated_at, useNA = "ifany")
+table(rsv_cohort$cohort_phase, useNA = "ifany")
+
+### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
+rsv_vacc$vacc_record_date <- as.Date(substr(rsv_vacc$vacc_record_created_at,1,10))
+rsv_vacc$days_between_vacc_and_recording <- as.double(difftime(rsv_vacc$vacc_record_date,rsv_vacc$vacc_occurence_time,units="days"))
+
+### CREATE BLANK PLACEHOLDER COLUMNS
+rsv_vacc$dups_same_day_flag <- NA
+rsv_vacc$VMT_only_dups_flag <- NA
+rsv_vacc$"cov_booster_interval (days)" <- NA
+rsv_vacc$"flu_interval (days)" <- NA
+rsv_vacc$"hz_interval (days)" <- NA
+rsv_vacc$"pneum_vacc_interval (weeks)" <- NA
+rsv_vacc$sort_date <- NA
+
+### CREATE RSV VACC DATAFRAME BY JOINING RSV VACC EVENT RECORDS WITH PATIENT RECORDS
+rsv_vacc <- rsv_vacc %>%
+  inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
+  arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
+  select(-patient_derived_encrypted_upi,-vacc_record_date) %>% # remove temp items from Interval calculation
+  # select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
+  mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
+  mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
+
+rsv_vacc$vacc_phase <- NA
+rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
+                             as.Date("2024-08-01"),as.Date("2025-07-31"))] <-
+  "Aug24_Jul25"
+
+
+### CREATE RSV VACCINATIONS DQ QUERIES
+#############################################################################################
+
+### CREATE SUMMARY TABLE OF PATIENT CHI STATUS USING PHSMETHODS CHI_CHECK
+rsv_chi_check <- rsv_vacc %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, vacc_data_source, CHIcheck) %>%
+  summarise(record_count = n())
+
+### CREATE SUMMARY TABLE OF VACC PRODUCT TYPE
+rsv_vacc_prodSumm <- rsv_vacc %>%
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, vacc_data_source, vacc_product_name) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC COHORTS - TRY TO INDICATE IF ONE COHORT OR MORE PER PERSON
+rsv_vacc_cohorts <- rsv_vacc %>% 
+  left_join(rsv_cohort,by="source_system_patient_id") %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, cohort, cohort_phase) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF DOSE NUMBERS
+rsv_dose_number <- rsv_vacc %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name,vacc_dose_number,vacc_booster) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC OCCURENCE DATES
+rsv_vacc_date <- rsv_vacc %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  group_by(vacc_location_health_board_name, vacc_occurence_time) %>%
+  summarise(record_count = n()) 
+
+### CREATE SUMMARY TABLE OF VACC OCCURENCE ISO WEEKS
+rsv_vacc_iso <- rsv_vacc %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  mutate(iso_week = lubridate::isoweek(vacc_occurence_time)) %>% 
+  group_by(vacc_location_health_board_name, iso_week) %>%
+  summarise(record_count = n()) 
+
+### CREATE TABLE AND SUMMARY OF PATIENTS WITH MISSING (NA) OR INVALID CHI NUMBER
+rsv_chi_inv  <- rsv_vacc %>% filter(CHIcheck!="Valid CHI") %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>%
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = paste0("01. Missing/Invalid CHI number - ",CHIcheck)) 
+
+rsv_chi_invSumm <- rsv_chi_inv %>%
+  group_by(vacc_location_health_board_name, vacc_location_name,
+           vacc_data_source,CHIcheck,Date_Administered) %>%
+  summarise(record_count = n())
+
+rsv_chi_inv <- rsv_chi_inv %>% select(-Date_Administered,-CHIcheck)
+
+rsv_vacc <- rsv_vacc %>% select(-CHIcheck)
+
+### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS
+rsv_dose1 <- rsv_vacc %>% filter(vacc_dose_number == "1")
+
+rsv_dose1x2IDs <- rsv_dose1 %>% group_by(patient_derived_upi_number) %>% 
+  summarise(count_by_patient_derived_upi_number = n()) %>%
+  na.omit(count_by_patient_derived_upi_number) %>%
+  filter(count_by_patient_derived_upi_number > 1)
+
+rsv_dose1x2 <- rsv_dose1 %>%
+  filter(patient_derived_upi_number %in% rsv_dose1x2IDs$patient_derived_upi_number)
+
+rsv_dose1x2sort <- rsv_dose1x2 %>%
+  select(vacc_event_created_at,patient_derived_upi_number) %>%
+  group_by(patient_derived_upi_number) %>%
+  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
+  rename(latest_date = vacc_event_created_at)
+
+rsv_dose1x2 <- rsv_dose1x2 %>%
+  left_join(rsv_dose1x2sort,by="patient_derived_upi_number") %>%
+  arrange(desc(latest_date)) %>%
+  mutate(sort_date = latest_date) %>%
+  mutate(QueryName = "02. RSV Two or more dose 1") %>% 
+  filter(sort_date >= reporting_start_date) %>% 
+  select(-latest_date)
+
+rm(rsv_dose1x2IDs,rsv_dose1x2sort)
+
+if (nrow(rsv_dose1x2)>0) {
+  # Create flag for duplicates occuring on same day
+  rsv_dose1x2_samedateIDs <- rsv_dose1x2 %>% 
+    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
+    summarise(nn = n()) %>%
+    filter(nn > 1)
+  
+  rsv_dose1x2 <- rsv_dose1x2 %>% 
+    left_join(rsv_dose1x2_samedateIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
+  
+  rsv_dose1x2$dups_same_day_flag <- 0
+  rsv_dose1x2$dups_same_day_flag [rsv_dose1x2$nn>0] <- 1
+  ###
+  
+  # Create flag for VMT-only dose 1 dups
+  rsv_dose1x2_VMT <- rsv_dose1x2 %>% filter(vacc_data_source == "TURAS") %>% 
+    arrange(desc(vacc_occurence_time))
+  
+  rsv_dose1x2_VMT_ids <- rsv_dose1x2_VMT %>% 
+    group_by(patient_derived_upi_number) %>% 
+    summarise(nn2=n()) %>% ungroup() %>% 
+    filter(nn2>1)
+  
+  rsv_dose1x2 <- rsv_dose1x2 %>% 
+    left_join(rsv_dose1x2_VMT_ids,by="patient_derived_upi_number")
+  
+  rsv_dose1x2$VMT_only_dups_flag <- 0
+  rsv_dose1x2$VMT_only_dups_flag [rsv_dose1x2$nn2>0] <- 1
+  ###
+  
+  rsv_dose1x2 <- rsv_dose1x2 %>% select(-nn,-nn2)
+  
+  rm(rsv_dose1x2_samedateIDs,rsv_dose1x2_VMT,rsv_dose1x2_VMT_ids)
+}
+
+rsv_dose1x2Summ <- rsv_dose1x2 %>%
+  group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
+  summarise(record_count = n())
+
+rsv_dose1x2 <- rsv_dose1x2 %>% select(-Date_Administered)
+
+### CREATE SUMMARY TABLE OF BOOSTER DOSES
+rsv_booster <- rsv_vacc %>% 
+  filter(vacc_event_created_at >= reporting_start_date &
+           vacc_booster=="TRUE") %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "23. RSV Booster Recorded") %>% 
+  select(-Date_Administered)
+
+rsv_boosterSumm <- rsv_booster %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name,
+           vacc_dose_number,vacc_booster,vacc_occurence_time) %>%
+  summarise(record_count = n()) 
+
+### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
+### THAT ARE NOT IN AGE-RELATED ELIGIBILITY COHORT
+
+# patients not aged 74-79 on 1st Aug 2024 and vaccinated 2024-25
+rsv_non_cohort <- rsv_vacc %>%
+  filter(vacc_phase=="Aug24_Jul25" &
+           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31"))) %>% 
+  left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(vacc_event_created_at >= reporting_start_date &
+           is.na(cohort)) %>%  
+  mutate(sort_date = vacc_event_created_at) %>%
+  mutate(QueryName = "24. RSV Non-cohort vacc age>55")
+
+rsv_non_cohortSumm <- rsv_non_cohort %>% 
+  group_by(vacc_location_health_board_name, age_at_vacc, patient_sex) %>%
+  summarise(record_count = n())
+
+rsv_non_cohort <- rsv_non_cohort %>%
+  filter(age_at_vacc>55) %>% 
+  select(-c(Date_Administered,cohort:cohort_target_diseases))
+
+### CREATE & SAVE OUT RSV VACC SUMMARY REPORT
+#############################################################################################
+
+#Collates pivot tables into a single report
+rsv_summary_report <-
+  list("System Summary" = rsv_system_summary,
+       "CHI Check" = rsv_chi_check,
+       "Vacc Product Type" = rsv_vacc_prodSumm,
+       "Vacc Cohorts" = rsv_vacc_cohorts,
+       "Vacc Dose Numbers" = rsv_dose_number,
+       "Vacc Boosters" = rsv_boosterSumm,
+       "Vacc Dates" = rsv_vacc_date,
+       "Vacc ISO Weeks" = rsv_vacc_iso,
+       "Missing or Invalid CHIs" = rsv_chi_invSumm,
+       "2 or More First Doses" = rsv_dose1x2Summ,
+       "Non-Cohort by age, sex" = rsv_non_cohortSumm)
+
+rm(rsv_system_summary,rsv_chi_check,rsv_vacc_prodSumm,rsv_vacc_cohorts,
+   rsv_dose_number,rsv_boosterSumm,rsv_vacc_date,rsv_vacc_iso,rsv_chi_invSumm,
+   rsv_dose1x2Summ,rsv_dose1,rsv_cohort,rsv_non_cohortSumm)
+
+#Saves out collated tables into an excel file
+if (answer==1) {
+  openxlsx::write.xlsx(rsv_summary_report,
+                       paste("Outputs/DQ Summary Reports/RSV_Vacc_DQ_4wk_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+                       asTable = TRUE,
+                       colWidths = "auto")
+} else {
+  openxlsx::write.xlsx(rsv_summary_report,
+                       paste("Outputs/DQ Summary Reports/RSV_Vacc_DQ_Full_Summary_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""),
+                       asTable = TRUE,
+                       colWidths = "auto")
+}
+
+rm(rsv_summary_report)
+
+### COLLATE RSV QUERIES FOR VACCINATIONS DQ REPORT
+#############################################################################################
+
+multi_vacc <- multi_vacc %>% rbind(rsv_chi_inv,rsv_dose1x2)
+rsv_vacc <- rbind(rsv_booster,rsv_non_cohort)
+
+rm(rsv_chi_inv,rsv_dose1x2,rsv_booster,rsv_non_cohort)
+
+gc()
+
+########################################################################
 ############################### SECTION E ##############################
 ########  UNIQUE DQ IDS, SORT & ORDER DATA, ALL QUERIES TABLE ##########
 ########################################################################
@@ -1880,8 +2189,31 @@ pneum_vacc <- pneum_vacc %>% arrange(desc(sort_date),DQ_ID,desc(vacc_event_creat
   select(QueryName,DQ_ID,patient_derived_chi_number,patient_derived_upi_number,
          everything())
 
+### CREATE UNIQUE DQ ID FOR ALL RECORDS IN multi_vacc TABLE
+rsv_vacc$DQ_ID <- paste(substr(rsv_vacc$QueryName,1,2),
+                        rsv_vacc$vacc_source_system_event_id,
+                        substr(rsv_vacc$vacc_event_created_at,1,10),sep = ".")
+
+### UPDATE DQ ID FOR DUPLICATE DOSE 1 QUERY
+d1ID <- rsv_vacc %>% filter(grepl("02.",rsv_vacc$QueryName)) %>% 
+  group_by(patient_derived_upi_number) %>% 
+  summarise(DQ_ID = first(DQ_ID)) %>% 
+  rename("maind1DQID" = DQ_ID)
+
+rsv_vacc <- rsv_vacc %>% left_join(d1ID,by="patient_derived_upi_number")
+
+rsv_vacc$DQ_ID <- ifelse(grepl("02.",rsv_vacc$QueryName),rsv_vacc$maind1DQID,rsv_vacc$DQ_ID)
+
+### TIDY UP rsv_vacc DATA TABLE
+rsv_vacc <- rsv_vacc %>% arrange(desc(sort_date),DQ_ID,desc(vacc_event_created_at)) %>% 
+  select(QueryName,DQ_ID,patient_derived_chi_number,patient_derived_upi_number,
+         everything(),-maind1DQID)
+
+rm(d1ID)
+
 ### CREATE A DATA TABLE OF ALL DATA QUERY RECORDS FOR HB REPORTS
-all_queries <- rbind(multi_vacc,covid_vacc,flu_vacc,hz_vacc,pneum_vacc) %>% 
+all_queries <- rbind(multi_vacc,covid_vacc,flu_vacc,hz_vacc,
+                     pneum_vacc,rsv_vacc) %>% 
   arrange(desc(sort_date),DQ_ID,desc(vacc_event_created_at)) %>% 
   select(-sort_date,-vacc_phase)
 
@@ -1891,6 +2223,7 @@ covid_vacc <- covid_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_p
 flu_vacc <- flu_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
 hz_vacc <- hz_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
 pneum_vacc <- pneum_vacc %>% select(-source_system_patient_id,-sort_date,-vacc_phase)
+rsv_vacc <- rsv_vacc %>% select(-sort_date,-vacc_phase)
 
 ########################################################################
 ################################ SECTION F #############################
@@ -1906,6 +2239,7 @@ for(i in 1:16) {
   df_flu <- flu_vacc %>% filter(vacc_location_health_board_name == hb_name[i])
   df_hz <- hz_vacc %>% filter(vacc_location_health_board_name == hb_name[i])
   df_pneum <- pneum_vacc %>% filter(vacc_location_health_board_name == hb_name[i])
+  df_rsv <- rsv_vacc %>% filter(vacc_location_health_board_name == hb_name[i])
   df_all <- all_queries %>% filter(vacc_location_health_board_name == hb_name[i])
   
   df_summ <- df_all %>% group_by(QueryName) %>% 
@@ -1929,7 +2263,8 @@ for(i in 1:16) {
              "Flu Vacc - Q12-14" = df_flu,
              "Herpes Zoster Vacc - Q15-20" =  df_hz,
              "Pneumococcal Vacc - Q21-22" = df_pneum,
-             "All query data - Q01-22" = df_all )
+             "RSV Vacc - Q23-24" = df_rsv,
+             "All query data - Q01-24" = df_all )
 
     HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
     setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
