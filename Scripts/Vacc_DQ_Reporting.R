@@ -719,10 +719,12 @@ cov_age12Summ <- CovVaxData %>% filter(age_at_vacc <12) %>%
 
 ### CREATE TABLE & SUMMARY OF PATIENTS AGED UNDER 12 GIVEN FULL DOSE
 cov_under12fulldose <- CovVaxData %>%
-  filter((age_at_vacc<12 &
-           vacc_product_name != "Covid-19 mRNA Vaccine Comirnaty 10mcg (Paed)" &
-           vacc_product_name != "Covid-19 mRNA Vaccine Comirnaty 3mcg (Infant)" &
-            !grepl("Children",vacc_product_name) )) %>%
+  filter(age_at_vacc<12 & !grepl("child",vacc_product_name) &
+           !grepl("Child",vacc_product_name) &
+           !grepl("inf",vacc_product_name) &
+           !grepl("Inf",vacc_product_name) &
+           !grepl("paed",vacc_product_name) &
+           !grepl("Paed",vacc_product_name)) %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "07. COV Under 12 adult dose")
@@ -735,15 +737,15 @@ cov_under12fulldoseSumm <- cov_under12fulldose %>%
 # this excludes those aged 12 who received a dose 1 paediatric dose at age 11
 cov_over12_under5_childdose <- CovVaxData %>%
   filter((age_at_vacc>12 | (age_at_vacc<5 & vacc_occurence_time >= "2023-04-01")) &
-           (vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 10mcg (Paed)" |
-           vacc_product_name == "Comirnaty XBB.1.5 Children 5-11 years COVID-19 mRNA Vaccine 10micrograms/0.3ml dose"))
+           (grepl("Paed",vacc_product_name) | grepl("paed",vacc_product_name) |
+              grepl("5-11",vacc_product_name)))
 
 cov_age11childdose <- CovVaxData %>% filter(age_at_vacc == "11" &
-                                              (vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 10mcg (Paed)" |
-                                                 vacc_product_name == "Comirnaty XBB.1.5 Children 5-11 years COVID-19 mRNA Vaccine 10micrograms/0.3ml dose"))
+                                              (grepl("Paed",vacc_product_name) | grepl("paed",vacc_product_name) |
+                                                 grepl("5-11",vacc_product_name)))
 cov_age12childdose <- CovVaxData %>% filter(age_at_vacc == "12" &
-                                              (vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 10mcg (Paed)" |
-                                                 vacc_product_name == "Comirnaty XBB.1.5 Children 5-11 years COVID-19 mRNA Vaccine 10micrograms/0.3ml dose"))
+                                              (grepl("Paed",vacc_product_name) | grepl("paed",vacc_product_name) |
+                                                 grepl("5-11",vacc_product_name)))
 
 cov_over11_under5_childdose <- anti_join(cov_age12childdose,cov_age11childdose,by="patient_derived_upi_number") %>%
   rbind(cov_over12_under5_childdose) %>%
@@ -764,13 +766,17 @@ cov_over5_infant_dose <- CovVaxData %>%
   filter(age_at_vacc>5 & (CovVaxData$vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 3mcg (Infant)" |
                           CovVaxData$vacc_product_name == "Comirnaty XBB.1.5 Children 6 months - 4 years COVID-19 mRNA Vaccine 3micrograms/0.2ml dose"))
 
+cov_over5_infant_dose <- CovVaxData %>% 
+  filter(age_at_vacc>5 & (grepl("inf",vacc_product_name) | grepl("Inf",vacc_product_name) |
+                            grepl("6 months",vacc_product_name)))
+
 cov_age4_infantdose <- CovVaxData %>% 
-  filter(age_at_vacc==4 & (CovVaxData$vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 3mcg (Infant)" |
-                            CovVaxData$vacc_product_name == "Comirnaty XBB.1.5 Children 6 months - 4 years COVID-19 mRNA Vaccine 3micrograms/0.2ml dose"))
+  filter(age_at_vacc==4 & (grepl("inf",vacc_product_name) | grepl("Inf",vacc_product_name) |
+                             grepl("6 months",vacc_product_name)))
   
 cov_age5_infantdose <- CovVaxData %>% 
-  filter(age_at_vacc==5 & (CovVaxData$vacc_product_name == "Covid-19 mRNA Vaccine Comirnaty 3mcg (Infant)" |
-                             CovVaxData$vacc_product_name == "Comirnaty XBB.1.5 Children 6 months - 4 years COVID-19 mRNA Vaccine 3micrograms/0.2ml dose"))
+  filter(age_at_vacc==5 & (grepl("inf",vacc_product_name) | grepl("Inf",vacc_product_name) |
+                             grepl("6 months",vacc_product_name)))
 
 cov_over4_infant_dose <- anti_join(cov_age5_infantdose,cov_age4_infantdose,by="patient_derived_upi_number") %>% 
   rbind(cov_over5_infant_dose) %>% 
