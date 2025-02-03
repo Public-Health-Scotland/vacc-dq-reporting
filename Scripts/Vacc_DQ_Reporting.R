@@ -1885,9 +1885,9 @@ rsv_vacc_prodSumm <- rsv_vacc %>%
 
 ### CREATE SUMMARY TABLE OF VACC COHORTS - TRY TO INDICATE IF ONE COHORT OR MORE PER PERSON
 rsv_vacc_cohorts <- rsv_vacc %>% 
-  left_join(rsv_cohort,by="source_system_patient_id") %>% 
+  left_join(rsv_cohort,by=c("source_system_patient_id","vacc_phase"="cohort_phase")) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
-  group_by(vacc_location_health_board_name, cohort, cohort_phase) %>%
+  group_by(vacc_location_health_board_name, cohort, vacc_phase) %>%
   summarise(record_count = n()) 
 
 ### CREATE SUMMARY TABLE OF DOSE NUMBERS
