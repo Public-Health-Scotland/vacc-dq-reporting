@@ -1498,15 +1498,22 @@ hz_ageDQ3 <- HZVaxData %>%
            !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
            !between(patient_date_of_birth,as.Date("1943-09-02"),as.Date("1953-09-01")))         
 
-# combine 3 ageDQ dfs and remove anyone in eligibility cohorts
-hz_ageDQ <- rbind(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3) %>%
+# patients not aged 65,66 or 70-79 on 1st Sep 2024 and vaccinated 2024-25
+hz_ageDQ4 <- HZVaxData %>%
+  filter(vacc_phase=="Sept24_Aug25" &
+           !between(patient_date_of_birth,as.Date("1958-09-02"),as.Date("1959-09-01")) &
+           !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
+           !between(patient_date_of_birth,as.Date("1944-09-02"),as.Date("1954-09-01")))         
+
+# combine 4 ageDQ dfs and remove anyone in eligibility cohorts
+hz_ageDQ <- rbind(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3,hz_ageDQ4) %>%
   left_join(hz_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
   filter(vacc_event_created_at >= reporting_start_date &
            is.na(cohort)) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "20. HZ Vacc given outwith age guidance") 
 
-rm(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3)
+rm(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3,hz_ageDQ4)
 
 hz_ageDQSumm <- hz_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
