@@ -89,7 +89,7 @@ conn <- odbc::dbConnect(odbc::odbc(),
                   uid = paste(Sys.info()['user']),
                   pwd = .rs.askForPassword("password"))
 
-reporting_start_date = as.Date("2021-01-01")
+reporting_start_date = as.Date("2020-12-01")
 answer <- svDialogs::dlgInput(paste0("Hello, ",(Sys.info()['user']),". Do you want to report on only the latest 4 weeks of data? y/n"))
 if (answer$res == "y" | answer$res == "Y") {
   reporting_start_date = as.Date(Sys.Date()-28)
@@ -715,6 +715,72 @@ cov_booster_intervalDQSumm <- cov_booster_intervalDQ %>%
   group_by(vacc_location_health_board_name,vacc_location_name,`cov_booster_interval (days)`) %>% 
   summarise(record_count = n())
 
+##############################################
+
+cov_boosterx2ids <- cov_booster %>% group_by(patient_derived_upi_number,vacc_phase) %>% 
+  summarise(count_by_patient_derived_upi_number = n()) %>%
+  na.omit(count_by_patient_derived_upi_number) %>%
+  filter(count_by_patient_derived_upi_number > 1)
+
+cov_boosterx2 <- cov_booster %>%
+  left_join(cov_boosterx2ids,by=c("patient_derived_upi_number","vacc_phase")) %>% 
+  filter(count_by_patient_derived_upi_number > 1)
+
+cov_boosterx2sort <- cov_boosterx2 %>% select(vacc_event_created_at,patient_derived_upi_number,vacc_phase) %>%
+  group_by(patient_derived_upi_number,vacc_phase) %>%
+  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
+  rename(latest_date = vacc_event_created_at)
+
+cov_boosterx2 <- cov_boosterx2 %>% 
+  left_join(cov_boosterx2sort,by=c("patient_derived_upi_number","vacc_phase")) %>%
+  arrange(desc(latest_date)) %>% 
+  mutate(sort_date = latest_date) %>%
+  mutate(QueryName = "06b. COV Two or more boosters") %>% 
+  filter(sort_date >= reporting_start_date) %>% 
+  select(-latest_date)
+
+rm(cov_boosterx2ids,cov_boosterx2sort)
+
+if (nrow(cov_boosterx2)>0) {
+  
+  # Create flag for duplicates occuring on same day
+  cov_boosterx2_samedateIDs <- cov_boosterx2 %>% 
+    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
+    summarise(nn = n()) %>%
+    filter(nn > 1)
+  
+  cov_boosterx2 <- cov_boosterx2 %>% 
+    left_join(cov_boosterx2_samedateIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
+  
+  cov_boosterx2$dups_same_day_flag <- 0
+  cov_boosterx2$dups_same_day_flag [cov_boosterx2$nn>0] <- 1
+  ###
+  
+  # Create flag for VMT-only duplicates
+  cov_boosterx2_VMT <- cov_boosterx2 %>% filter(vacc_data_source == "TURAS")
+  
+  cov_boosterx2_VMT_ids <- cov_boosterx2_VMT %>% 
+    group_by(patient_derived_upi_number,vacc_phase) %>% 
+    summarise(nn2=n()) %>% ungroup() %>% 
+    filter(nn2>1)
+  
+  cov_boosterx2 <- cov_boosterx2 %>% 
+    left_join(cov_boosterx2_VMT_ids,by=c("patient_derived_upi_number","vacc_phase"))
+  
+  cov_boosterx2$VMT_only_dups_flag <- 0
+  cov_boosterx2$VMT_only_dups_flag [cov_boosterx2$nn2>0] <- 1
+  ###
+  
+  cov_boosterx2 <- cov_boosterx2 %>% select(-nn,-nn2)
+  
+  rm(cov_boosterx2_samedateIDs,cov_boosterx2_VMT,cov_boosterx2_VMT_ids)
+}
+
+cov_boosterx2Summ <- cov_boosterx2 %>% group_by(vacc_location_health_board_name) %>% 
+  summarise(record_count = n())
+
+
+#############################################
 ### CREATE SUMMARY TABLE OF RECORDS OF VACCINATIONS GIVEN TO AGE <12
 cov_age12Summ <- CovVaxData %>% filter(age_at_vacc <12) %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
@@ -828,6 +894,27 @@ rm(cov_dose1andboostersort,cov_dose1andboosterIDs)
 
 cov_dose1andboosterSumm <- cov_dose1andbooster %>% group_by(vacc_location_health_board_name) %>% 
   summarise(record_count=n())
+
+### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
+### THAT ARE NOT IN SIS OR CARE HOME ELIGIBILITY COHORTS
+
+# patients aged <75 on 30th Jun 2025 and non-cohort, or <6months on 31st March 2025,
+# and vaccinated Spring 2025
+cov_ageDQ <- CovVaxData %>% 
+  filter(vacc_phase=="Spring 2025") %>%
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
+              patient_date_of_birth>as.Date("2024-09-30")) %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "12. COV Vacc given outwith age guidance") 
+
+cov_ageDQSumm <- cov_ageDQ %>%
+  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, age_at_vacc) %>%
+  summarise(record_count = n())
+
+cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases))
+
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
 #############################################################################################
