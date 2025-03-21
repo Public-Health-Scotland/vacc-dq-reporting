@@ -398,6 +398,10 @@ CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
 CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
                                as.Date("2024-09-01"),as.Date("2025-03-31"))] <-
   "Autumn Winter 2024_25"
+CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
+                               as.Date("2025-03-31"),as.Date("2025-06-30"))] <-
+  "Spring 2025"
+
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
