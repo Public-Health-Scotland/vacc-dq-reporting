@@ -94,8 +94,7 @@ answer <- svDialogs::dlgInput(paste0("Hello, ",(Sys.info()['user']),". Do you wa
 if (answer$res == "y" | answer$res == "Y") {
   reporting_start_date = as.Date(Sys.Date()-28)
   answer <- 1
-} else
-    {answer <- 0}
+} else {answer <- 0}
 
 ### LIST HEALTH BOARD CODES AND NAMES FOR CREATING HB REPORTS
 hb_cypher <- c("A","B","Y","F","V","G","N","H","L","S","R","Z","T","W","NWTC","SAS")
@@ -376,32 +375,32 @@ CovVaxData <- CovVaxData %>%
 
 ### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
 CovVaxData$vacc_phase <- NA
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2020-12-01"),as.Date("2021-08-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2020-12-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2021-09-01")] <-
   "Tranche1"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2021-09-01"),as.Date("2022-03-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2021-09-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2022-04-01")] <-
   "Tranche2"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2022-04-01"),as.Date("2022-08-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2022-04-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2022-09-01")] <-
   "COVID Spring Booster 2022"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2022-09-01"),as.Date("2023-03-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2022-09-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2023-04-01")] <-
   "Autumn Winter 2022_23"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2023-04-01"),as.Date("2023-08-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2023-04-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2023-09-01")] <-
   "Spring 2023"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2023-09-01"),as.Date("2024-03-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2023-09-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2024-04-01")] <-
   "Autumn Winter 2023_24"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2024-04-01"),as.Date("2024-08-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2024-04-01") &
+                         CovVaxData$vacc_occurence_time<as.Date("2024-07-01")] <-
   "Spring 2024"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2024-09-01"),as.Date("2025-03-31"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2024-09-23") &
+                         CovVaxData$vacc_occurence_time<as.Date("2025-02-01")] <-
   "Autumn Winter 2024_25"
-CovVaxData$vacc_phase [between(CovVaxData$vacc_occurence_time,
-                               as.Date("2025-03-31"),as.Date("2025-06-30"))] <-
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-03-31") &
+                         CovVaxData$vacc_occurence_time<as.Date("2025-09-01")] <-
   "Spring 2025"
 
 
@@ -717,7 +716,7 @@ cov_booster_intervalDQSumm <- cov_booster_intervalDQ %>%
   group_by(vacc_location_health_board_name,vacc_location_name,`cov_booster_interval (days)`) %>% 
   summarise(record_count = n())
 
-##############################################
+### CREATE TABLE OF PATIENTS WITH 2 OR MORE BOOSTERS IN SINGLE CAMPAIGN
 
 cov_boosterx2ids <- cov_booster %>% group_by(patient_derived_upi_number,vacc_phase) %>% 
   summarise(count_by_patient_derived_upi_number = n()) %>%
@@ -737,7 +736,7 @@ cov_boosterx2 <- cov_boosterx2 %>%
   left_join(cov_boosterx2sort,by=c("patient_derived_upi_number","vacc_phase")) %>%
   arrange(desc(latest_date)) %>% 
   mutate(sort_date = latest_date) %>%
-  mutate(QueryName = "06b. COV Two or more boosters") %>% 
+  mutate(QueryName = "06b. COV Two or more boosters in campaign") %>% 
   filter(sort_date >= reporting_start_date) %>% 
   select(-latest_date)
 
@@ -778,7 +777,8 @@ if (nrow(cov_boosterx2)>0) {
   rm(cov_boosterx2_samedateIDs,cov_boosterx2_VMT,cov_boosterx2_VMT_ids)
 }
 
-cov_boosterx2Summ <- cov_boosterx2 %>% group_by(vacc_location_health_board_name) %>% 
+cov_boosterx2Summ <- cov_boosterx2 %>% group_by(vacc_location_health_board_name,
+                                                vacc_phase) %>% 
   summarise(record_count = n())
 
 
