@@ -338,6 +338,8 @@ cov_cohort$cohort_phase [cov_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
 cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2023_24"] <-
   "Autumn Winter 2023_24"
+cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2024_25"] <- 
+  "Autumn Winter 2024_25"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 CovVaxData$vacc_record_date <- as.Date(substr(CovVaxData$vacc_record_created_at,1,10))
@@ -426,7 +428,7 @@ cov_vacc_doseSumm <- CovVaxData %>%
            vacc_booster) %>%
   summarise(record_count = n()) 
 
-### CREATE SUMMARY TABLE OF VACC COHORTS - TRY TO INDICATE IF ONE COHORT OR MORE PER PERSON
+### CREATE SUMMARY TABLE OF VACC COHORTS
 cov_vacc_cohorts <- CovVaxData %>% 
   left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
