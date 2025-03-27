@@ -1438,16 +1438,28 @@ hz_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_updated_at,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis_audit
-            where cohort like '%SHINGLES%' ")
+            where (cohort like '%SHINGLES%' OR
+              cohort='AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING' OR
+              cohort='AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING') ")
 
 table(hz_cohort$cohort_target_diseases, useNA = "ifany")
 table(hz_cohort$cohort_phase, useNA = "ifany")
 table(hz_cohort$cohort, useNA = "ifany")
 
-hz_cohort$cohort_phase [is.na(hz_cohort$cohort_target_diseases)] <-
+hz_cohort$cohort_phase [is.na(hz_cohort$cohort_target_diseases) &
+                          hz_cohort$cohort_phase=="Scottish Immunisation Programme"] <-
   "Sept21_Aug22"
 hz_cohort$cohort_phase [hz_cohort$cohort_phase=="Scottish Immunisation Programme"] <-
   "Sept22_Aug23"
+hz_cohort$cohort_phase [hz_cohort$cohort_phase=="Spring 2024"] <- 
+  "Sept23_Aug24"
+hz_cohort$cohort_phase [hz_cohort$cohort_phase=="Autumn Winter 2024_25" |
+                          hz_cohort$cohort_phase=="Spring 2025"] <- 
+  "Sept24_Aug25"
+
+hz_cohort$cohort [hz_cohort$cohort=="AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING"] <- 
+  "AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING"
+
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 HZVaxData$vacc_record_date <- as.Date(substr(HZVaxData$vacc_record_created_at,1,10))
@@ -1496,6 +1508,11 @@ HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2024-09-01"),as.Date("2025-08-31"))] <-
   "Sept24_Aug25"
 
+### CREATE LIST OF UPIs OF PATIENTS IN WIS COHORT
+wis_cohort <- hz_cohort %>% 
+  filter(cohort=="AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING") %>% 
+  select(source_system_patient_id,cohort_phase) %>% distinct()
+
 ### CREATE SHINGLES VACCINATIONS DQ QUERIES
 #############################################################################################
 
@@ -1533,6 +1550,7 @@ hz_chi_inv <- hz_chi_inv %>% select(-CHIcheck,-Date_Administered)
 HZVaxData <- HZVaxData %>% select(-CHIcheck)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS
+# excludes people in WIS cohort
 hz_dose1 <- HZVaxData %>% filter(vacc_dose_number == "1")
 
 hz_dose1x2IDs <- hz_dose1 %>% group_by(patient_derived_upi_number) %>% 
@@ -1591,7 +1609,10 @@ hz_dose1x2 <- hz_dose1x2 %>% select(-nn,-nn2)
     
 rm(hz_dose1x2_samedateIDs,hz_dose1x2_VMT,hz_dose1x2_VMT_ids)
 }
-    
+
+hz_dose1x2 <- hz_dose1x2 %>% 
+  filter(!source_system_patient_id %in% wis_cohort$source_system_patient_id)
+  
 hz_dose1x2Summ <- hz_dose1x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
@@ -1599,6 +1620,7 @@ hz_dose1x2Summ <- hz_dose1x2 %>%
 hz_dose1x2 <- hz_dose1x2 %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 2 VACCINATIONS
+# excludes people in WIS cohort
 hz_dose2 <- HZVaxData %>% filter(vacc_dose_number == "2")
 
 hz_dose2x2IDs <- hz_dose2 %>% group_by(patient_derived_upi_number) %>% 
@@ -1658,6 +1680,9 @@ hz_dose2x2 <- hz_dose2x2 %>% select(-nn,-nn2)
 rm(hz_dose2x2_samedateIDs,hz_dose2x2IDsVMT,hz_dose2x2IDsVMT_ids)
 }
 
+hz_dose2x2 <- hz_dose2x2 %>% 
+  filter(!source_system_patient_id %in% wis_cohort$source_system_patient_id)
+
 hz_dose2x2Summ <- hz_dose2x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
@@ -1696,6 +1721,7 @@ hz_dose2_earlySumm <- hz_dose2_early %>%
 hz_dose2_early <- hz_dose2_early %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF SHINGRIX DOSE 2 GIVEN AFTER ZOSTAVAX DOSE 1
+### AND NO DOSE 1 SHINGRIX
 hz_zostd1 <- hz_dose1 %>% 
   filter(vacc_product_name == "Shingles Vaccine Zostavax Merck")
 
@@ -1761,7 +1787,7 @@ hz_zostavax_errorSumm <- hz_zostavax_error %>%
 hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
-### THAT ARE NOT IN SIS ELIGIBILITY COHORT
+### THAT ARE NOT IN SIS OR WIS ELIGIBILITY COHORTS
 
 # patients not aged 70-79 on 1st Sep 2021 and vaccinated 2021-22
 hz_ageDQ1 <- HZVaxData %>% 
