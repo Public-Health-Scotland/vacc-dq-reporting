@@ -716,73 +716,6 @@ cov_booster_intervalDQSumm <- cov_booster_intervalDQ %>%
   group_by(vacc_location_health_board_name,vacc_location_name,`cov_booster_interval (days)`) %>% 
   summarise(record_count = n())
 
-### CREATE TABLE OF PATIENTS WITH 2 OR MORE BOOSTERS IN SINGLE CAMPAIGN
-
-cov_boosterx2ids <- cov_booster %>% group_by(patient_derived_upi_number,vacc_phase) %>% 
-  summarise(count_by_patient_derived_upi_number = n()) %>%
-  na.omit(count_by_patient_derived_upi_number) %>%
-  filter(count_by_patient_derived_upi_number > 1)
-
-cov_boosterx2 <- cov_booster %>%
-  left_join(cov_boosterx2ids,by=c("patient_derived_upi_number","vacc_phase")) %>% 
-  filter(count_by_patient_derived_upi_number > 1)
-
-cov_boosterx2sort <- cov_boosterx2 %>% select(vacc_event_created_at,patient_derived_upi_number,vacc_phase) %>%
-  group_by(patient_derived_upi_number,vacc_phase) %>%
-  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
-  rename(latest_date = vacc_event_created_at)
-
-cov_boosterx2 <- cov_boosterx2 %>% 
-  left_join(cov_boosterx2sort,by=c("patient_derived_upi_number","vacc_phase")) %>%
-  arrange(desc(latest_date)) %>% 
-  mutate(sort_date = latest_date) %>%
-  mutate(QueryName = "06b. COV Two or more boosters in campaign") %>% 
-  filter(sort_date >= reporting_start_date) %>% 
-  select(-latest_date)
-
-rm(cov_boosterx2ids,cov_boosterx2sort)
-
-if (nrow(cov_boosterx2)>0) {
-  
-  # Create flag for duplicates occuring on same day
-  cov_boosterx2_samedateIDs <- cov_boosterx2 %>% 
-    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
-    summarise(nn = n()) %>%
-    filter(nn > 1)
-  
-  cov_boosterx2 <- cov_boosterx2 %>% 
-    left_join(cov_boosterx2_samedateIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
-  
-  cov_boosterx2$dups_same_day_flag <- 0
-  cov_boosterx2$dups_same_day_flag [cov_boosterx2$nn>0] <- 1
-  ###
-  
-  # Create flag for VMT-only duplicates
-  cov_boosterx2_VMT <- cov_boosterx2 %>% filter(vacc_data_source == "TURAS")
-  
-  cov_boosterx2_VMT_ids <- cov_boosterx2_VMT %>% 
-    group_by(patient_derived_upi_number,vacc_phase) %>% 
-    summarise(nn2=n()) %>% ungroup() %>% 
-    filter(nn2>1)
-  
-  cov_boosterx2 <- cov_boosterx2 %>% 
-    left_join(cov_boosterx2_VMT_ids,by=c("patient_derived_upi_number","vacc_phase"))
-  
-  cov_boosterx2$VMT_only_dups_flag <- 0
-  cov_boosterx2$VMT_only_dups_flag [cov_boosterx2$nn2>0] <- 1
-  ###
-  
-  cov_boosterx2 <- cov_boosterx2 %>% select(-nn,-nn2)
-  
-  rm(cov_boosterx2_samedateIDs,cov_boosterx2_VMT,cov_boosterx2_VMT_ids)
-}
-
-cov_boosterx2Summ <- cov_boosterx2 %>% group_by(vacc_location_health_board_name,
-                                                vacc_phase) %>% 
-  summarise(record_count = n())
-
-
-#############################################
 ### CREATE SUMMARY TABLE OF RECORDS OF VACCINATIONS GIVEN TO AGE <12
 cov_age12Summ <- CovVaxData %>% filter(age_at_vacc <12) %>%
   filter(vacc_event_created_at >= reporting_start_date) %>% 
@@ -897,25 +830,111 @@ rm(cov_dose1andboostersort,cov_dose1andboosterIDs)
 cov_dose1andboosterSumm <- cov_dose1andbooster %>% group_by(vacc_location_health_board_name) %>% 
   summarise(record_count=n())
 
+### CREATE TABLE OF PATIENTS WITH 2 OR MORE BOOSTERS IN SINGLE CAMPAIGN
+# ONLY ON DATA FROM SPRING 2024 PROG ONWARDS
+
+cov_booster <- cov_booster %>% 
+  filter(vacc_occurence_time>=as.Date("2024-04-01"))
+
+cov_boosterx2ids <- cov_booster %>%
+  group_by(patient_derived_upi_number,vacc_phase) %>% 
+  summarise(count_by_patient_derived_upi_number = n()) %>%
+  na.omit(count_by_patient_derived_upi_number) %>%
+  filter(count_by_patient_derived_upi_number > 1)
+
+cov_boosterx2 <- cov_booster %>%
+  left_join(cov_boosterx2ids,by=c("patient_derived_upi_number","vacc_phase")) %>% 
+  filter(count_by_patient_derived_upi_number > 1) %>% 
+  select(-count_by_patient_derived_upi_number)
+
+cov_boosterx2sort <- cov_boosterx2 %>% select(vacc_event_created_at,patient_derived_upi_number,vacc_phase) %>%
+  group_by(patient_derived_upi_number,vacc_phase) %>%
+  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
+  rename(latest_date = vacc_event_created_at)
+
+cov_boosterx2 <- cov_boosterx2 %>% 
+  left_join(cov_boosterx2sort,by=c("patient_derived_upi_number","vacc_phase")) %>%
+  arrange(desc(latest_date)) %>% 
+  mutate(sort_date = latest_date) %>%
+  mutate(QueryName = "25. COV Two or more boosters in campaign") %>% 
+  filter(sort_date >= reporting_start_date) %>% 
+  select(-c(latest_date,count_by_patient_derived_upi_number))
+
+rm(cov_boosterx2ids,cov_boosterx2sort)
+
+if (nrow(cov_boosterx2)>0) {
+  
+  # Create flag for duplicates occuring on same day
+  cov_boosterx2_samedateIDs <- cov_boosterx2 %>% 
+    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
+    summarise(nn = n()) %>%
+    filter(nn > 1)
+  
+  cov_boosterx2 <- cov_boosterx2 %>% 
+    left_join(cov_boosterx2_samedateIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
+  
+  cov_boosterx2$dups_same_day_flag <- 0
+  cov_boosterx2$dups_same_day_flag [cov_boosterx2$nn>0] <- 1
+  ###
+  
+  # Create flag for VMT-only duplicates
+  cov_boosterx2_VMT <- cov_boosterx2 %>% filter(vacc_data_source == "TURAS")
+  
+  cov_boosterx2_VMT_ids <- cov_boosterx2_VMT %>% 
+    group_by(patient_derived_upi_number,vacc_phase) %>% 
+    summarise(nn2=n()) %>% ungroup() %>% 
+    filter(nn2>1)
+  
+  cov_boosterx2 <- cov_boosterx2 %>% 
+    left_join(cov_boosterx2_VMT_ids,by=c("patient_derived_upi_number","vacc_phase"))
+  
+  cov_boosterx2$VMT_only_dups_flag <- 0
+  cov_boosterx2$VMT_only_dups_flag [cov_boosterx2$nn2>0] <- 1
+  ###
+  
+  cov_boosterx2 <- cov_boosterx2 %>% select(-nn,-nn2)
+  
+  rm(cov_boosterx2_samedateIDs,cov_boosterx2_VMT,cov_boosterx2_VMT_ids)
+}
+
+cov_boosterx2Summ <- cov_boosterx2 %>% group_by(vacc_location_health_board_name,
+                                                vacc_phase) %>% 
+  summarise(record_count = n())
+
+### CREATE TABLE & SUMMARY OF VACCINATIONS OUTWITH VERIFIED VACC PROGRAMME (vacc_phase)
+# ONLY ON DATA FROM SPRING 2024 ONWARDS
+
+cov_outwith_prog <- CovVaxData %>% 
+  filter(vacc_occurence_time>=as.Date("2024-04-01") &
+           is.na(vacc_phase)) %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "26. COV Outwith vacc programme")
+
+cov_outwith_progSumm <- cov_outwith_prog %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name) %>% 
+  summarise(record_count = n())
+
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
 ### THAT ARE NOT IN SIS OR CARE HOME ELIGIBILITY COHORTS
+# ONLY ON DATA FROM SPRING 2025 PROG ONWARDS
 
 # patients aged <75 on 30th Jun 2025 and non-cohort, or <6months on 31st March 2025,
 # and vaccinated Spring 2025
 cov_ageDQ <- CovVaxData %>% 
-  filter(vacc_phase=="Spring 2025") %>%
+  filter(vacc_occurence_time>=as.Date("2025-03-31")) %>%
   left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
   filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
-              patient_date_of_birth>as.Date("2024-09-30")) %>% 
+           patient_date_of_birth>as.Date("2024-09-30")) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "12. COV Vacc given outwith age guidance") 
+  mutate(QueryName = "27. COV Vacc given outwith age guidance") 
 
 cov_ageDQSumm <- cov_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, age_at_vacc) %>%
   summarise(record_count = n())
 
-cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases))
+cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases,CHIcheck))
 
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
@@ -939,14 +958,18 @@ cov_SummaryReport <-
        ">11 or <5 paediatric dose" = cov_over11_under5_childdoseSumm,
        "Over 4 infant dose" = cov_over4_infant_doseSumm,
        "Dose 2, no dose 1" = cov_dose2nodose1Summ,
-       "Dose 1 and booster, no dose 2" = cov_dose1andboosterSumm)
+       "Dose 1 and booster, no dose 2" = cov_dose1andboosterSumm,
+       "2 or more boosters in campaign" = cov_boosterx2Summ,
+       "Outwith vacc programme" = cov_outwith_progSumm,
+       "Vacc given outwith age guidance" = cov_ageDQSumm)
 
 rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
    cov_vacc_doseSumm,cov_vacc_cohorts,cov_chi_invSumm,
    cov_dose1x2Summ,cov_dose2x2Summ,cov_dose3x2Summ,cov_dose4x2Summ,cov_booster_intervalDQSumm,
    cov_age12Summ,cov_under12fulldoseSumm,cov_over11_under5_childdoseSumm,
    cov_over4_infant_doseSumm,cov_dose2nodose1Summ,cov_dose1andboosterSumm,
-   cov_dose1,cov_dose2,cov_dose3,cov_dose4,cov_booster,cov_cohort)
+   cov_dose1,cov_dose2,cov_dose3,cov_dose4,cov_booster,cov_cohort,
+   cov_boosterx2Summ,outwith_progSumm,cov_ageDQSumm)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -968,11 +991,13 @@ rm(cov_SummaryReport)
 
 multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2)
 covid_vacc <- rbind(cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
-                    cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster)
+                    cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster,
+                    cov_boosterx2,cov_outwith_prog,cov_ageDQ)
 
 rm(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
    cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
-   cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster)
+   cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster,
+   cov_boosterx2,cov_outwith_prog,cov_ageDQ)
 
 gc()
 
@@ -1037,6 +1062,8 @@ flu_cohort$cohort_phase [flu_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
 flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2023_24"] <-
   "Autumn Winter 2023_24"
+flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2024_25"] <-
+  "Autumn Winter 2024_25"
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 FluVaxData$vacc_record_date <- as.Date(substr(FluVaxData$vacc_record_created_at,1,10))
@@ -1072,18 +1099,25 @@ FluVaxData <- FluVaxData %>%
 
 ### CREATE VACC OCCURENCE PHASE TO LINK COHORT DATA BY COHORT PHASE
 FluVaxData$vacc_phase <- NA
-FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
-                               as.Date("2021-09-01"),as.Date("2022-03-31"))] <-
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2021-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2022-04-01")] <-
   "Tranche2"
-FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
-                               as.Date("2022-09-01"),as.Date("2023-03-31"))] <-
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2022-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2023-04-01")] <-
   "Autumn Winter 2022_23"
-FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
-                               as.Date("2023-09-01"),as.Date("2024-03-31"))] <-
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2023-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2024-04-01")] <-
   "Autumn Winter 2023_24"
-FluVaxData$vacc_phase [between(FluVaxData$vacc_occurence_time,
-                               as.Date("2024-09-01"),as.Date("2025-03-31"))] <-
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2024-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2025-04-01")] <-
   "Autumn Winter 2024_25"
+
+table(FluVaxData$vacc_phase,useNA = "ifany")
+
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2021-04-01") &
+                         is.na(FluVaxData$vacc_phase)] <-
+  "Outwith Autumn/Winter"
+table(FluVaxData$vacc_phase,useNA = "ifany")
 
 
 ### CREATE FLU VACCINATIONS DQ QUERIES
@@ -1121,6 +1155,144 @@ flu_chi_inv <- flu_chi_inv %>% select(-Date_Administered,-CHIcheck)
 
 FluVaxData <- FluVaxData %>% select(-CHIcheck)
 
+### CREATE TABLE OF PATIENTS WITH 2 OR MORE dose 1 RECORDS AND SUMMARY
+flu_dose1 <- FluVaxData |>
+  filter(vacc_dose_number == "1" &
+           !(is.na(vacc_phase)) &
+           vacc_phase != "Outwith Autumn/Winter") |> 
+  arrange(desc(patient_derived_upi_number))
+
+table(flu_dose1$vacc_phase)
+
+## Modified to use vacc_phase
+flu_multidose1IDs <- flu_dose1 |> 
+  group_by(patient_derived_upi_number, vacc_phase) |> 
+  summarise(count_ID = n()) |> 
+  na.omit(count_ID) 
+
+flu_multidose1 <- flu_dose1 |> 
+  left_join(flu_multidose1IDs,by=c("patient_derived_upi_number","vacc_phase")) |> 
+  filter(count_ID>1) |> 
+  select(-count_ID)
+
+flu_multidose1sort <- flu_multidose1 %>% 
+  select(vacc_event_created_at,patient_derived_upi_number) %>%
+  group_by(patient_derived_upi_number) %>% 
+  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
+  rename(latest_date = vacc_event_created_at)
+
+flu_multidose1 <- flu_multidose1 %>% 
+  left_join(flu_multidose1sort,by="patient_derived_upi_number") %>% 
+  arrange(desc(latest_date)) %>% 
+  mutate(sort_date = latest_date) %>% 
+  mutate(QueryName = "02. FLU Two or more dose 1") %>%
+  filter(sort_date >= reporting_start_date) %>% 
+  select(-latest_date, -Date_Administered) 
+
+if (nrow(flu_multidose1)>0) {
+  
+  # Create flag for duplicates on the same day
+  flu_multidose1_samedayIDs <- flu_multidose1 %>% 
+    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
+    summarise(nn = n()) %>%
+    filter(nn > 1)
+  
+  flu_multidose1 <- flu_multidose1 %>% 
+    left_join(flu_multidose1_samedayIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
+  
+  flu_multidose1$dups_same_day_flag <- 0
+  flu_multidose1$dups_same_day_flag [flu_multidose1$nn>0] <- 1
+  
+  # Create flag for VMT-only doses dups
+  flu_multidose1_VMT <- flu_multidose1 %>% filter(vacc_data_source == "TURAS")
+  
+  flu_multidose1_VMT_ids <- flu_multidose1_VMT %>% 
+    group_by(patient_derived_upi_number) %>% 
+    summarise(nn2=n()) %>% ungroup() %>% 
+    filter(nn2>1)
+  
+  flu_multidose1 <- flu_multidose1 %>% 
+    left_join(flu_multidose1_VMT_ids,by="patient_derived_upi_number")
+  
+  flu_multidose1$VMT_only_dups_flag <- 0
+  flu_multidose1$VMT_only_dups_flag [flu_multidose1$nn2>0] <- 1
+  
+  flu_multidose1 <- flu_multidose1 %>% select(-nn,-nn2)
+  
+  rm(flu_multidose1_VMT,flu_multidose1_VMT_ids,flu_multidose1_samedayIDs)
+}
+
+flu_multidose1Summ <- flu_multidose1 %>% group_by(vacc_location_health_board_name) %>% 
+  summarise(record_count = n())
+
+### CREATE TABLE OF PATIENTS WITH 2 OR MORE dose 2 RECORDS AND SUMMARY
+flu_dose2 <- FluVaxData |> 
+  filter(vacc_dose_number == "2" &
+           !(is.na(vacc_phase)) &
+           vacc_phase != "Outwith Autumn/Winter") |> 
+  arrange(desc(patient_derived_upi_number))
+
+## Modified to use vacc_phase
+flu_multidose2IDs <- flu_dose2 |> 
+  group_by(patient_derived_upi_number, vacc_phase) |> 
+  summarise(count_ID = n()) |> 
+  na.omit(count_ID) 
+
+flu_multidose2 <- flu_dose2 |> 
+  left_join(flu_multidose2IDs,by=c("patient_derived_upi_number","vacc_phase")) |> 
+  filter(count_ID>1) |> 
+  select(-count_ID)
+
+flu_multidose2sort <- flu_multidose2 %>% 
+  select(vacc_event_created_at,patient_derived_upi_number) %>% 
+  group_by(patient_derived_upi_number) %>% 
+  summarise(vacc_event_created_at=max(vacc_event_created_at)) %>%
+  rename(latest_date = vacc_event_created_at)
+
+flu_multidose2 <- flu_multidose2 %>% 
+  left_join(flu_multidose2sort,by="patient_derived_upi_number") %>% 
+  arrange(desc(latest_date)) %>% 
+  mutate(sort_date = latest_date) %>% 
+  mutate(QueryName = "03. FLU Two or more dose 2") %>%
+  filter(sort_date >= reporting_start_date) %>% 
+  select(-latest_date, -Date_Administered) 
+
+if (nrow(flu_multidose2)>0) {
+  
+  # Create flag for duplicates on the same day
+  flu_multidose2_samedayIDs <- flu_multidose2 %>% 
+    group_by(patient_derived_upi_number,vacc_occurence_time) %>% 
+    summarise(nn = n()) %>%
+    filter(nn > 1)
+  
+  flu_multidose2 <- flu_multidose2 %>% 
+    left_join(flu_multidose2_samedayIDs,join_by(patient_derived_upi_number,vacc_occurence_time))
+  
+  flu_multidose2$dups_same_day_flag <- 0
+  flu_multidose2$dups_same_day_flag [flu_multidose2$nn>0] <- 1
+  
+  # Create flag for VMT-only doses dups
+  flu_multidose2_VMT <- flu_multidose2 %>% filter(vacc_data_source == "TURAS")
+  
+  flu_multidose2_VMT_ids <- flu_multidose2_VMT %>% 
+    group_by(patient_derived_upi_number) %>% 
+    summarise(nn2=n()) %>% ungroup() %>% 
+    filter(nn2>1)
+  
+  flu_multidose2 <- flu_multidose2 %>% 
+    left_join(flu_multidose2_VMT_ids,by="patient_derived_upi_number")
+  
+  flu_multidose2$VMT_only_dups_flag <- 0
+  flu_multidose2$VMT_only_dups_flag [flu_multidose2$nn2>0] <- 1
+  
+  flu_multidose2 <- flu_multidose2 %>% select(-nn,-nn2)
+  
+  rm(flu_multidose2_VMT,flu_multidose2_VMT_ids,flu_multidose2_samedayIDs)
+}
+
+flu_multidose2Summ <- flu_multidose2 %>% group_by(vacc_location_health_board_name) %>% 
+  summarise(record_count = n())
+
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATIONS GIVEN AT INTERVAL OF < 4 WEEKS
 flu_interval <- FluVaxData %>% filter(`flu_interval (days)`<28) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
@@ -1157,6 +1329,18 @@ flu_fluenz_ageDQSumm <- flu_fluenz_ageDQ %>%
 
 flu_fluenz_ageDQ <- flu_fluenz_ageDQ %>% select(-Date_Administered)
 
+### CREATE TABLE AND SUMMARY OF PATIENTS OF VACCINATIONS GIVEN OUTWITH AUTUMN/WINTER CAMPAIGNS
+flu_outwith <- FluVaxData %>% filter(vacc_phase == "Outwith Autumn/Winter") %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "28. FLU Outwith Autumn/Winter campaigns")
+
+flu_outwithSumm <- flu_outwith %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name,vacc_phase,Date_Administered) %>% 
+  summarise(record_count = n())
+
+flu_outwith <- flu_outwith %>% select(-Date_Administered)
+
 ### CREATE & SAVE OUT FLU VACC SUMMARY REPORT
 #############################################################################################
 
@@ -1167,13 +1351,16 @@ flu_SummaryReport <-
        "Vacc Product Type" = flu_vacc_prodSumm,
        "Vacc Cohorts" = flu_vacc_cohorts,
        "Missing or Invalid CHIs" = flu_chi_invSumm,
+       "2 or more dose 1" = flu_multidose1Summ,
+       "2 or more dose 2" = flu_multidose2Summ,
        "Interval < 4 weeks" =  flu_intervalSumm,
        "Vaccine before 06.09.2021" = flu_earlySumm,
-       "Fluenz Given to Aged <2 or >17" = flu_fluenz_ageDQSumm)
+       "Fluenz Given to Aged <2 or >17" = flu_fluenz_ageDQSumm,
+       "Outwith Autumn-Winter Campaigns" = flu_outwithSumm)
 
 rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_vacc_cohorts,
    flu_chi_invSumm,flu_intervalSumm,flu_earlySumm,flu_fluenz_ageDQSumm,
-   flu_cohort)
+   flu_cohort,flu_multidose1Summ,flu_multidose2Summ,flu_outwithSumm)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1193,10 +1380,11 @@ rm(flu_SummaryReport)
 ### COLLATE FLU QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- multi_vacc %>% rbind(flu_chi_inv)
-flu_vacc <- rbind(flu_interval,flu_early,flu_fluenz_ageDQ)
+multi_vacc <- multi_vacc %>% rbind(flu_chi_inv,flu_multidose1,flu_multidose2)
+flu_vacc <- rbind(flu_interval,flu_early,flu_fluenz_ageDQ,flu_outwith)
 
-rm(flu_chi_inv,flu_interval,flu_early,flu_fluenz_ageDQ)
+rm(flu_chi_inv,flu_interval,flu_early,flu_fluenz_ageDQ,flu_multidose1,
+   flu_multidose2,flu_outwith)
 
 gc()
 
