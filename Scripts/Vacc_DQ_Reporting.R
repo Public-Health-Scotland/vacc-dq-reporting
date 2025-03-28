@@ -1879,6 +1879,12 @@ rm(hz_chi_inv,hz_dose1x2,hz_dose2x2,hz_dose2_Zost,hz_dose2_early,hz_wrongvaxtype
 
 gc()
 
+saveRDS(multi_vacc,"Outputs/Temp/multi_vacc.rds")
+# multi_vacc <- readRDS("Outputs/Temp/multi_vacc.rds")
+saveRDS(hz_vacc,"Outputs/Temp/hz_vacc.rds")
+# hz_vacc <- readRDS("Outputs/Temp/hz_vacc.rds")
+
+
 ########################################################################
 ###############################  SECTION D4 ############################
 ########################  PNEUMOCOCCAL VACCINATIONS ####################
@@ -1925,14 +1931,26 @@ pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_updated_at,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis_audit
-            where cohort like '%PNEUMOCOCCAL%' ")
+            where (cohort like '%PNEUMOCOCCAL%' OR
+              cohort='AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING' OR
+              cohort='AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING') ")
 
 table(pneum_cohort$cohort_target_diseases, useNA = "ifany")
 table(pneum_cohort$cohort_phase, useNA = "ifany")
 table(pneum_cohort$cohort, useNA = "ifany")
 
+pneum_cohort$cohort [pneum_cohort$cohort=="AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING"] <- 
+  "AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING"
+
 pneum_cohort$cohort_phase [pneum_cohort$cohort_phase=="Scottish Immunisation Programme"] <- 
-  "Jan23_Mar24"
+  "Apr22_Mar23"
+pneum_cohort$cohort_phase [pneum_cohort$cohort_phase=="Spring 2024"] <- 
+  "Apr24_Mar25"
+pneum_cohort$cohort_phase [pneum_cohort$cohort_phase=="Autumn Winter 2024_25"] <- 
+  "Apr24_Mar25"
+# pneum_cohort$cohort_phase [pneum_cohort$cohort_phase=="Spring 2025"] <- 
+#   "Apr25_Mar26"
+
 
 ### CALCULATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 PneumVaxData$vacc_record_date <- as.Date(substr(PneumVaxData$vacc_record_created_at,1,10))
@@ -1971,9 +1989,6 @@ PneumVaxData$vacc_phase <- NA
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2022-04-01"),as.Date("2023-03-31"))] <-
   "Apr22_Mar23"
-PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
-                                 as.Date("2023-01-01"),as.Date("2024-03-31"))] <-
-  "Jan23_Mar24"
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2023-04-01"),as.Date("2024-03-31"))] <-
   "Apr23_Mar24"
@@ -2097,6 +2112,11 @@ pneum_vacc <- rbind(pneum_early,pneum_ageDQ)
 rm(pneum_chi_inv,pneum_early,pneum_ageDQ)
 
 gc()
+
+saveRDS(multi_vacc,"Outputs/Temp/multi_vacc.rds")
+# multi_vacc <- readRDS("Outputs/Temp/multi_vacc.rds")
+saveRDS(pneum_vacc,"Outputs/Temp/pneum_vacc.rds")
+# pneum_vacc <- readRDS("Outputs/Temp/pneum_vacc.rds")
 
 ########################################################################
 ###############################  SECTION D5 ############################
