@@ -2056,6 +2056,7 @@ pneum_ageDQ_oldSumm <- PneumVaxData %>%
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN AGE < 65
 ### THAT ARE NOT IN ELIGIBILITY COHORT
 pneum_ageDQ <- PneumVaxData %>%
+  filter(vacc_occurence_time<"2025-04-01") %>% #temp end point until new cohorts for 2025/26 added
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   filter(age_at_vacc < 65 & !is.na(vacc_phase)) %>%
   left_join(pneum_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
