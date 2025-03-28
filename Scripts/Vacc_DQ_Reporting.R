@@ -2627,12 +2627,12 @@ for(i in 1:16) {
       HBReport <-
         list("Summary" = df_summ,
              "Multi Vacc - Q01-05" = df_multi,
-             "Covid-19 Vacc - Q06-11" = df_cov,
-             "Flu Vacc - Q12-14" = df_flu,
+             "Covid-19 Vacc - Q06-11,25-27" = df_cov,
+             "Flu Vacc - Q12-14,28" = df_flu,
              "Herpes Zoster Vacc - Q15-20" =  df_hz,
              "Pneumococcal Vacc - Q21-22" = df_pneum,
              "RSV Vacc - Q23-24" = df_rsv,
-             "All query data - Q01-24" = df_all )
+             "All query data - Q01-28" = df_all )
 
     HBReportWB <- buildWorkbook(HBReport, asTable = TRUE)
     setColWidths(HBReportWB,sheet = 1,cols = 1,widths = "auto")
