@@ -364,6 +364,7 @@ CovVaxData$"cov_booster_interval (days)" [CovVaxData$vacc_booster=="FALSE"] <- N
 CovVaxData$"flu_interval (days)" <- NA
 CovVaxData$"hz_interval (days)" <- NA
 CovVaxData$"pneum_vacc_interval (weeks)" <- NA
+CovVaxData$"rsv_interval (days)" <- NA
 CovVaxData$sort_date <- NA
 
 ### CREATE COVID-19 VACC DATAFRAME BY JOINING COVID VACC EVENT RECORDS WITH PATIENT & COHORT RECORDS
@@ -1087,6 +1088,7 @@ FluVaxData$"flu_interval (days)" [is.na(FluVaxData$patient_derived_encrypted_upi
 
 FluVaxData$"hz_interval (days)" <- NA
 FluVaxData$"pneum_vacc_interval (weeks)" <- NA
+FluVaxData$"rsv_interval (days)" <- NA
 FluVaxData$sort_date <- NA
 
 ### CREATE FLU VACC DATAFRAME BY JOINING FLU VACC EVENT RECORDS WITH PATIENT RECORDS
@@ -1483,6 +1485,7 @@ HZVaxData$"hz_interval (days)" <- ifelse(HZVaxData$dose_number=="1",NA,HZVaxData
 HZVaxData$"hz_interval (days)" [is.na(HZVaxData$patient_derived_encrypted_upi)] <- NA
 
 HZVaxData$"pneum_vacc_interval (weeks)" <- NA
+HZVaxData$"rsv_interval (days)" <- NA
 HZVaxData$sort_date <- NA
 
 ### CREATE SHINGLES VACC DATAFRAME BY JOINING SHINGLES VACC EVENT RECORDS WITH PATIENT RECORDS
@@ -1973,6 +1976,8 @@ PneumVaxData <- PneumVaxData %>%
 
 PneumVaxData$"pneum_vacc_interval (weeks)" <- ifelse(PneumVaxData$dose_number=="1",NA,PneumVaxData$"pneum_vacc_interval (weeks)")
 
+PneumVaxData$"rsv_interval (days)" <- NA
+
 ### CREATE BLANK PLACEHOLDER COLUMN
 PneumVaxData$sort_date <- NA
 
@@ -2186,14 +2191,26 @@ rsv_vacc$"cov_booster_interval (days)" <- NA
 rsv_vacc$"flu_interval (days)" <- NA
 rsv_vacc$"hz_interval (days)" <- NA
 rsv_vacc$"pneum_vacc_interval (weeks)" <- NA
+
+### CALCULATE INTERVAL BETWEEN VACCINES PER PATIENT
+rsv_vacc <- rsv_vacc %>%
+  arrange(patient_derived_encrypted_upi,vacc_occurence_time) %>% 
+  group_by(patient_derived_encrypted_upi) %>%
+  mutate(dose_number = row_number()) %>% mutate(doses = n()) %>% ungroup() %>% 
+  mutate(prev_vacc_date=lag(vacc_occurence_time)) %>%
+  mutate("rsv_interval (days)"=as.integer(difftime(vacc_occurence_time,prev_vacc_date,units = "days")))
+
+rsv_vacc$"rsv_interval (days)" <- ifelse(rsv_vacc$dose_number=="1",NA,rsv_vacc$"rsv_interval (days)")
+rsv_vacc$"rsv_interval (days)" [is.na(rsv_vacc$patient_derived_encrypted_upi)] <- NA
+
 rsv_vacc$sort_date <- NA
 
 ### CREATE RSV VACC DATAFRAME BY JOINING RSV VACC EVENT RECORDS WITH PATIENT RECORDS
 rsv_vacc <- rsv_vacc %>%
   inner_join(Vaxpatientraw, by=("source_system_patient_id")) %>%
   arrange(desc(vacc_event_created_at)) %>% # sort data by date amended
-  select(-patient_derived_encrypted_upi,-vacc_record_date) %>% # remove temp items from Interval calculation
-  # select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
+  # select(-patient_derived_encrypted_upi,-vacc_record_date) %>% # remove temp items from Interval calculation
+  select(-patient_derived_encrypted_upi,-vacc_record_date,-dose_number,-doses,-prev_vacc_date) %>% # remove temp items from Interval calculation
   mutate(Date_Administered = substr(vacc_occurence_time, 1, 10)) %>% # create new vacc date data item for date only (no time)
   mutate(CHIcheck = phsmethods::chi_check(patient_derived_chi_number)) # create CHI check data item
 
@@ -2260,12 +2277,22 @@ rsv_chi_inv <- rsv_chi_inv %>% select(-Date_Administered,-CHIcheck)
 rsv_vacc <- rsv_vacc %>% select(-CHIcheck)
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS
+### FOR PEOPLE AGED >55, OR <55 AND INTERVAL < 28 WEEKS
 rsv_dose1 <- rsv_vacc %>% filter(vacc_dose_number == "1")
 
+rsv_dose1$`rsv_interval (days)` [is.na(rsv_dose1$`rsv_interval (days)`)] <- 
+  "0.0" # numbers required for 'max' function below
+
 rsv_dose1x2IDs <- rsv_dose1 %>% group_by(patient_derived_upi_number) %>% 
-  summarise(count_by_patient_derived_upi_number = n()) %>%
+  summarise(count_by_patient_derived_upi_number = n(),
+            min_age=as.integer(min(age_at_vacc)),
+            interval=as.integer(max(`rsv_interval (days)`)) ) %>%
   na.omit(count_by_patient_derived_upi_number) %>%
-  filter(count_by_patient_derived_upi_number > 1)
+  filter(count_by_patient_derived_upi_number > 1 &
+           (min_age>55 | interval<195) )
+
+rsv_dose1$`rsv_interval (days)` [rsv_dose1$`rsv_interval (days)`=="0.0"] <- 
+  NA # convert 0.0s back to nulls
 
 rsv_dose1x2 <- rsv_dose1 %>%
   filter(patient_derived_upi_number %in% rsv_dose1x2IDs$patient_derived_upi_number)
