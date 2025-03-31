@@ -340,6 +340,8 @@ cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2023_24"]
 cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2024_25"] <- 
   "Autumn Winter 2024_25"
 
+table(cov_cohort$cohort_phase,useNA = "ifany")
+
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 CovVaxData$vacc_record_date <- as.Date(substr(CovVaxData$vacc_record_created_at,1,10))
 CovVaxData$days_between_vacc_and_recording <- as.double(difftime(CovVaxData$vacc_record_date,CovVaxData$vacc_occurence_time,units="days"))
@@ -401,9 +403,10 @@ CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2024-09-23") &
                          CovVaxData$vacc_occurence_time<as.Date("2025-02-01")] <-
   "Autumn Winter 2024_25"
 CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-03-31") &
-                         CovVaxData$vacc_occurence_time<as.Date("2025-09-01")] <-
+                         CovVaxData$vacc_occurence_time<as.Date("2025-06-30")] <-
   "Spring 2025"
 
+table(CovVaxData$vacc_phase)
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -859,7 +862,7 @@ cov_boosterx2 <- cov_boosterx2 %>%
   mutate(sort_date = latest_date) %>%
   mutate(QueryName = "25. COV Two or more boosters in campaign") %>% 
   filter(sort_date >= reporting_start_date) %>% 
-  select(-c(latest_date,count_by_patient_derived_upi_number))
+  select(-c(latest_date))
 
 rm(cov_boosterx2ids,cov_boosterx2sort)
 
@@ -913,7 +916,7 @@ cov_outwith_prog <- CovVaxData %>%
   mutate(QueryName = "26. COV Outwith vacc programme")
 
 cov_outwith_progSumm <- cov_outwith_prog %>% 
-  group_by(vacc_location_health_board_name,vacc_location_name) %>% 
+  group_by(vacc_location_health_board_name,vacc_location_name,vacc_occurence_time) %>% 
   summarise(record_count = n())
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
@@ -935,7 +938,7 @@ cov_ageDQSumm <- cov_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, age_at_vacc) %>%
   summarise(record_count = n())
 
-cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases,CHIcheck))
+cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases))
 
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
@@ -970,7 +973,7 @@ rm(CovVaxData,CovSystemSummary,cov_chi_check,cov_vacc_prodSumm,
    cov_age12Summ,cov_under12fulldoseSumm,cov_over11_under5_childdoseSumm,
    cov_over4_infant_doseSumm,cov_dose2nodose1Summ,cov_dose1andboosterSumm,
    cov_dose1,cov_dose2,cov_dose3,cov_dose4,cov_booster,cov_cohort,
-   cov_boosterx2Summ,outwith_progSumm,cov_ageDQSumm)
+   cov_boosterx2Summ,cov_outwith_progSumm,cov_ageDQSumm)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1440,9 +1443,8 @@ hz_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_updated_at,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis_audit
-            where (cohort like '%SHINGLES%' OR
-              cohort='AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING' OR
-              cohort='AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING') ")
+                          where (cohort like '%SHINGLES%' OR
+                          cohort_target_diseases='4740000 - Herpes zoster (disorder)') ")
 
 table(hz_cohort$cohort_target_diseases, useNA = "ifany")
 table(hz_cohort$cohort_phase, useNA = "ifany")
@@ -1934,9 +1936,7 @@ pneum_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                                       # patient_cohort_updated_at,
                                       cohort_phase
                           from vaccination.vaccination_patient_cohort_analysis_audit
-            where (cohort like '%PNEUMOCOCCAL%' OR
-              cohort='AGE_6_MONTHS_AND_OVER_ WEAKENED_IMMUNE_SYSTEM _REPORTING' OR
-              cohort='AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING') ")
+            where cohort like '%PNEUMOCOCCAL%' ")
 
 table(pneum_cohort$cohort_target_diseases, useNA = "ifany")
 table(pneum_cohort$cohort_phase, useNA = "ifany")
