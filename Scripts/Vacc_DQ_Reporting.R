@@ -406,7 +406,7 @@ CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-03-31") &
                          CovVaxData$vacc_occurence_time<as.Date("2025-06-30")] <-
   "Spring 2025"
 
-table(CovVaxData$vacc_phase)
+table(CovVaxData$vacc_phase,useNA = "ifany")
 
 ### CREATE COVID-19 VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1069,6 +1069,8 @@ flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2023_24"]
 flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2024_25"] <-
   "Autumn Winter 2024_25"
 
+table(flu_cohort$cohort_phase,useNA = "ifany")
+
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 FluVaxData$vacc_record_date <- as.Date(substr(FluVaxData$vacc_record_created_at,1,10))
 FluVaxData$days_between_vacc_and_recording <- as.double(difftime(FluVaxData$vacc_record_date,FluVaxData$vacc_occurence_time,units="days"))
@@ -1118,7 +1120,6 @@ FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2024-09-01") &
   "Autumn Winter 2024_25"
 
 table(FluVaxData$vacc_phase,useNA = "ifany")
-
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2021-04-01") &
                          is.na(FluVaxData$vacc_phase)] <-
   "Outwith Autumn/Winter"
@@ -1230,6 +1231,8 @@ if (nrow(flu_multidose1)>0) {
 flu_multidose1Summ <- flu_multidose1 %>% group_by(vacc_location_health_board_name) %>% 
   summarise(record_count = n())
 
+rm(flu_multidose1IDs,flu_multidose1sort)
+
 ### CREATE TABLE OF PATIENTS WITH 2 OR MORE dose 2 RECORDS AND SUMMARY
 flu_dose2 <- FluVaxData |> 
   filter(vacc_dose_number == "2" &
@@ -1298,6 +1301,8 @@ if (nrow(flu_multidose2)>0) {
 flu_multidose2Summ <- flu_multidose2 %>% group_by(vacc_location_health_board_name) %>% 
   summarise(record_count = n())
 
+rm(flu_multidose2IDs,flu_multidose2sort)
+
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACCINATIONS GIVEN AT INTERVAL OF < 4 WEEKS
 flu_interval <- FluVaxData %>% filter(`flu_interval (days)`<28) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
@@ -1320,25 +1325,41 @@ flu_earlySumm <- flu_early %>% group_by(vacc_location_health_board_name,vacc_loc
 
 flu_early <- flu_early %>% select(-Date_Administered)
 
-### CREATE TABLE OF RECORDS & SUMMARY OF FLUENZ VACCINATION GIVEN AT AGE <2 OR >17
-flu_fluenz_ageDQ <- FluVaxData %>%
-  filter(vacc_product_name == "Fluenz Tetra Vaccine AstraZeneca") %>%
-  filter(age_at_vacc < 2 | age_at_vacc > 17) %>% 
+### CREATE TABLE OF RECORDS & SUMMARY OF LAIV (FLUENZ) VACCINATION GIVEN AT AGE <2 OR >18
+flu_laiv_ageDQ <- FluVaxData %>%
+  filter(grepl("Fluenz", vacc_product_name)) %>% 
+  filter(age_at_vacc < 2 | age_at_vacc > 18) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "14. FLU Fluenz given age <2 or >17")
+  mutate(QueryName = "14. FLU LAIV given age <2 or >18")
 
-flu_fluenz_ageDQSumm <- flu_fluenz_ageDQ %>%
+flu_laiv_ageDQSumm <- flu_laiv_ageDQ %>%
+  group_by(vacc_location_health_board_name,vacc_location_name,
+           vacc_product_name,Date_Administered, age_at_vacc) %>%
+  summarise(record_count = n())
+
+flu_laiv_ageDQ <- flu_laiv_ageDQ %>% select(-Date_Administered)
+
+### CREATE TABLE OF RECORDS & SUMMARY OF AQIV VACCINATION GIVEN AT AGE <50
+flu_aqiv_ageDQ <- FluVaxData %>%
+  filter(vacc_product_name=="Adjuvanted Quadrivalent Influenza Vaccine Seqirus" &
+           vacc_occurence_time>="2024-09-01" &
+           age_at_vacc < 50) %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  mutate(sort_date = vacc_event_created_at) %>% 
+  mutate(QueryName = "28. FLU AQIV given age <50")
+
+flu_aqiv_ageDQSumm <- flu_aqiv_ageDQ %>%
   group_by(vacc_location_health_board_name, vacc_location_name, Date_Administered, age_at_vacc) %>%
   summarise(record_count = n())
 
-flu_fluenz_ageDQ <- flu_fluenz_ageDQ %>% select(-Date_Administered)
+flu_aqiv_ageDQ <- flu_aqiv_ageDQ %>% select(-Date_Administered)
 
 ### CREATE TABLE AND SUMMARY OF PATIENTS OF VACCINATIONS GIVEN OUTWITH AUTUMN/WINTER CAMPAIGNS
 flu_outwith <- FluVaxData %>% filter(vacc_phase == "Outwith Autumn/Winter") %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
-  mutate(QueryName = "28. FLU Outwith Autumn/Winter campaigns")
+  mutate(QueryName = "29. FLU Outwith Autumn/Winter campaigns")
 
 flu_outwithSumm <- flu_outwith %>% 
   group_by(vacc_location_health_board_name,vacc_location_name,vacc_phase,Date_Administered) %>% 
@@ -1360,12 +1381,14 @@ flu_SummaryReport <-
        "2 or more dose 2" = flu_multidose2Summ,
        "Interval < 4 weeks" =  flu_intervalSumm,
        "Vaccine before 06.09.2021" = flu_earlySumm,
-       "Fluenz Given to Aged <2 or >17" = flu_fluenz_ageDQSumm,
+       "LAIV given age <2 or >18" = flu_laiv_ageDQSumm,
+       "AQIV given age <50" = flu_aqiv_ageDQSumm,
        "Outwith Autumn-Winter Campaigns" = flu_outwithSumm)
 
 rm(FluVaxData,FluSystemSummary,flu_chi_check,flu_vacc_prodSumm,flu_vacc_cohorts,
-   flu_chi_invSumm,flu_intervalSumm,flu_earlySumm,flu_fluenz_ageDQSumm,
-   flu_cohort,flu_multidose1Summ,flu_multidose2Summ,flu_outwithSumm)
+   flu_chi_invSumm,flu_intervalSumm,flu_earlySumm,flu_cohort,
+   flu_multidose1Summ,flu_multidose2Summ,flu_laiv_ageDQSumm,flu_aqiv_ageDQSumm,
+   flu_outwithSumm,flu_dose1,flu_dose2)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
@@ -1386,10 +1409,10 @@ rm(flu_SummaryReport)
 #############################################################################################
 
 multi_vacc <- multi_vacc %>% rbind(flu_chi_inv,flu_multidose1,flu_multidose2)
-flu_vacc <- rbind(flu_interval,flu_early,flu_fluenz_ageDQ,flu_outwith)
+flu_vacc <- rbind(flu_interval,flu_early,flu_laiv_ageDQ,flu_aqiv_ageDQ,flu_outwith)
 
-rm(flu_chi_inv,flu_interval,flu_early,flu_fluenz_ageDQ,flu_multidose1,
-   flu_multidose2,flu_outwith)
+rm(flu_chi_inv,flu_multidose1,flu_multidose2,flu_interval,flu_early,
+   flu_laiv_ageDQ,flu_aqiv_ageDQ,flu_outwith)
 
 gc()
 
