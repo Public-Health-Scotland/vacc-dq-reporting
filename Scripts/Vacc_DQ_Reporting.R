@@ -2643,7 +2643,7 @@ for(i in 1:16) {
     
 
     insertImage(HBReportWB,sheet = 1,file = "Scripts/Vacc HB DQ Summary.jpg",
-                  width = 10,height = 10,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
+                  width = 10,height = 11,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
 
     saveWorkbook(HBReportWB,paste("Outputs/DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
     
