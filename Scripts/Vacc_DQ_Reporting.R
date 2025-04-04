@@ -303,7 +303,9 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc
+                        age_at_vacc,
+                        reporting_location_type,
+                        vacc_location_derived_location_type
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='COVID-19'
@@ -920,13 +922,20 @@ cov_outwith_progSumm <- cov_outwith_prog %>%
   summarise(record_count = n())
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
-### THAT ARE NOT IN SIS OR CARE HOME ELIGIBILITY COHORTS
+### THAT ARE NOT IN SIS ELIGIBILITY COHORT OR IN A CARE HOME
 # ONLY ON DATA FROM SPRING 2025 PROG ONWARDS
 
 # patients aged <75 on 30th Jun 2025 and non-cohort, or <6months on 31st March 2025,
 # and vaccinated Spring 2025
 cov_ageDQ <- CovVaxData %>% 
-  filter(vacc_occurence_time>=as.Date("2025-03-31")) %>%
+  filter(vacc_occurence_time>=as.Date("2025-03-31") &
+           reporting_location_type!="CARE HOME CODE" &
+           vacc_location_derived_location_type!="Home for the Elderly" &
+           vacc_location_derived_location_type!="Private Nursing Home, Private Hospital etc" &
+           !grepl("care",vacc_location_name) &
+           !grepl("Care",vacc_location_name) &
+           !grepl("CARE",vacc_location_name) &
+           !grepl("Nursing",vacc_location_name) )  %>%
   left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
   filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
            patient_date_of_birth>as.Date("2024-09-30")) %>% 
