@@ -296,6 +296,8 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_occurence_time,
                         vacc_location_health_board_name,
                         vacc_location_name,
+                        reporting_location_type,
+                        vacc_location_derived_location_type,
                         vacc_product_name, 
                         vacc_batch_number, 
                         vacc_performer_name,
@@ -303,9 +305,7 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_booster,
                         vacc_data_source, 
                         vacc_data_source_display,
-                        age_at_vacc,
-                        reporting_location_type,
-                        vacc_location_derived_location_type
+                        age_at_vacc
                         from vaccination.vaccination_event_analysis
                         WHERE vacc_status='completed' 
                           AND vacc_type_target_disease='COVID-19'
@@ -1002,10 +1002,12 @@ rm(cov_SummaryReport)
 ### COLLATE COVID QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2)
+multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2) %>% 
+  select(-c(reporting_location_type,vacc_location_derived_location_type))
 covid_vacc <- rbind(cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
                     cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster,
-                    cov_boosterx2,cov_outwith_prog,cov_ageDQ)
+                    cov_boosterx2,cov_outwith_prog,cov_ageDQ)%>% 
+  select(-c(reporting_location_type,vacc_location_derived_location_type))
 
 rm(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
    cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
