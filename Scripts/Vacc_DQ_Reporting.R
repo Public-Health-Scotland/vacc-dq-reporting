@@ -296,6 +296,8 @@ CovVaxData <- odbc::dbGetQuery(conn, "select
                         vacc_occurence_time,
                         vacc_location_health_board_name,
                         vacc_location_name,
+                        reporting_location_type,
+                        vacc_location_derived_location_type,
                         vacc_product_name, 
                         vacc_batch_number, 
                         vacc_performer_name,
@@ -920,13 +922,20 @@ cov_outwith_progSumm <- cov_outwith_prog %>%
   summarise(record_count = n())
 
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
-### THAT ARE NOT IN SIS OR CARE HOME ELIGIBILITY COHORTS
+### THAT ARE NOT IN SIS ELIGIBILITY COHORT OR IN A CARE HOME
 # ONLY ON DATA FROM SPRING 2025 PROG ONWARDS
 
 # patients aged <75 on 30th Jun 2025 and non-cohort, or <6months on 31st March 2025,
 # and vaccinated Spring 2025
 cov_ageDQ <- CovVaxData %>% 
-  filter(vacc_occurence_time>=as.Date("2025-03-31")) %>%
+  filter(vacc_occurence_time>=as.Date("2025-03-31") &
+           reporting_location_type!="CARE HOME CODE" &
+           vacc_location_derived_location_type!="Home for the Elderly" &
+           vacc_location_derived_location_type!="Private Nursing Home, Private Hospital etc" &
+           !grepl("care",vacc_location_name) &
+           !grepl("Care",vacc_location_name) &
+           !grepl("CARE",vacc_location_name) &
+           !grepl("Nursing",vacc_location_name) )  %>%
   left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
   filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
            patient_date_of_birth>as.Date("2024-09-30")) %>% 
@@ -993,10 +1002,12 @@ rm(cov_SummaryReport)
 ### COLLATE COVID QUERIES FOR VACCINATIONS DQ REPORT
 #############################################################################################
 
-multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2)
+multi_vacc <- rbind(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2) %>% 
+  select(-c(reporting_location_type,vacc_location_derived_location_type))
 covid_vacc <- rbind(cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
                     cov_over4_infant_dose,cov_dose2nodose1,cov_dose1andbooster,
-                    cov_boosterx2,cov_outwith_prog,cov_ageDQ)
+                    cov_boosterx2,cov_outwith_prog,cov_ageDQ)%>% 
+  select(-c(reporting_location_type,vacc_location_derived_location_type))
 
 rm(cov_chi_inv,cov_dose1x2,cov_dose2x2,cov_dose3x2,cov_dose4x2,
    cov_booster_intervalDQ,cov_under12fulldose,cov_over11_under5_childdose,
@@ -1527,7 +1538,11 @@ HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2024-09-01"),as.Date("2025-08-31"))] <-
   "Sept24_Aug25"
 
-table(HZVaxData$cohort_phase, useNA = "ifany")
+table(HZVaxData$vacc_phase, useNA = "ifany")
+
+### CREATE A COHORT LIST OF SEVERELY IMMUNOSUPPRESSED (SIS)
+hz_cohort_sis <- hz_cohort %>% filter(grepl("IMMUNO_SUPP",cohort)) %>% 
+  distinct()
 
 ### CREATE SHINGLES VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -1565,10 +1580,12 @@ hz_chi_inv <- hz_chi_inv %>% select(-CHIcheck,-Date_Administered)
 
 HZVaxData <- HZVaxData %>% select(-CHIcheck)
 
-### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS
+### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 1 VACCINATIONS (OF SAME
+### VACC PRODUCT - THIS EXCLUDES PERSONS NEW TO WIS LIST WHO HAVE PREVIOUSLY
+### RECEIVED ZOSTAVAX - ALSO EXCLUDES SIS COHORT)
 hz_dose1 <- HZVaxData %>% filter(vacc_dose_number == "1")
 
-hz_dose1x2IDs <- hz_dose1 %>% group_by(patient_derived_upi_number) %>% 
+hz_dose1x2IDs <- hz_dose1 %>% group_by(patient_derived_upi_number,vacc_product_name) %>% 
   summarise(count_by_patient_derived_upi_number = n()) %>%
   na.omit(count_by_patient_derived_upi_number) %>%
   filter(count_by_patient_derived_upi_number > 1)
@@ -1625,14 +1642,18 @@ hz_dose1x2 <- hz_dose1x2 %>% select(-nn,-nn2)
 rm(hz_dose1x2_samedateIDs,hz_dose1x2_VMT,hz_dose1x2_VMT_ids)
 }
 
+hz_dose1x2 <- hz_dose1x2 %>%
+  filter(!source_system_patient_id %in% hz_cohort_sis$source_system_patient_id)
+
 hz_dose1x2Summ <- hz_dose1x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
 hz_dose1x2 <- hz_dose1x2 %>% select(-Date_Administered)
 
-### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 2 VACCINATIONS
-# excludes people in WIS cohort
+### CREATE TABLE OF RECORDS & SUMMARY OF 2 OR MORE DOSE 2 VACCINATIONS (OF SAME
+### VACC PRODUCT - THIS EXCLUDES PERSONS NEW TO WIS LIST WHO HAVE PREVIOUSLY
+### RECEIVED ZOSTAVAX - ALSO EXCLUDES SIS COHORT)
 hz_dose2 <- HZVaxData %>% filter(vacc_dose_number == "2")
 
 hz_dose2x2IDs <- hz_dose2 %>% group_by(patient_derived_upi_number) %>% 
@@ -1691,6 +1712,9 @@ hz_dose2x2 <- hz_dose2x2 %>% select(-nn,-nn2)
     
 rm(hz_dose2x2_samedateIDs,hz_dose2x2IDsVMT,hz_dose2x2IDsVMT_ids)
 }
+
+hz_dose2x2 <- hz_dose2x2 %>%
+  filter(!source_system_patient_id %in% hz_cohort_sis$source_system_patient_id)
 
 hz_dose2x2Summ <- hz_dose2x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
@@ -1859,7 +1883,7 @@ HZSummaryReport <-
 rm(HZVaxData,HZSystemSummary,hz_chi_check,hz_vacc_prodSumm,hz_vacc_cohorts,
    hz_chi_invSumm,hz_dose1x2Summ,hz_dose2x2Summ,hz_dose2_ZostSumm,
    hz_dose2_earlySumm,hz_wrongvaxtypeSumm,hz_dose2_nodose1Summ,
-   hz_zostavax_errorSumm,hz_ageDQSumm,hz_dose1,hz_dose2,hz_cohort)
+   hz_zostavax_errorSumm,hz_ageDQSumm,hz_dose1,hz_dose2,hz_cohort,hz_cohort_sis)
 
 #Saves out collated tables into an excel file
 if (answer==1) {
