@@ -337,10 +337,13 @@ table(cov_cohort$cohort [is.na(cov_cohort$cohort_phase)])
 
 cov_cohort$cohort_phase [cov_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
-cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2023_24"] <-
+cov_cohort$cohort_phase [cov_cohort$cohort_phase=="Autumn Winter 23_24"] <-
   "Autumn Winter 2023_24"
-cov_cohort$cohort_phase [cov_cohort$cohort_description=="Autumn Winter 2024_25"] <- 
-  "Autumn Winter 2024_25"
+cov_cohort$cohort_phase <- ifelse((is.na(cov_cohort$cohort_phase) |
+                             cov_cohort$cohort_phase=="July_24" |
+                             cov_cohort$cohort_phase=="September 2023" |
+                             cov_cohort$cohort_phase=="Imported from NCDS"),
+                        cov_cohort$cohort_description,cov_cohort$cohort_phase)
 
 table(cov_cohort$cohort_phase,useNA = "ifany")
 
