@@ -2023,6 +2023,9 @@ PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
 PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
                                  as.Date("2024-04-01"),as.Date("2025-03-31"))] <-
   "Apr24_Mar25"
+PneumVaxData$vacc_phase [between(PneumVaxData$vacc_occurence_time,
+                                 as.Date("2025-04-01"),as.Date("2026-03-31"))] <-
+  "Apr25_Mar26"
 
 table(PneumVaxData$vacc_phase,useNA = "ifany")
 
@@ -2086,7 +2089,7 @@ pneum_ageDQ_oldSumm <- PneumVaxData %>%
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN AGE < 65
 ### THAT ARE NOT IN ELIGIBILITY COHORT
 pneum_ageDQ <- PneumVaxData %>%
-  filter(vacc_occurence_time<"2025-04-01") %>% #temp end point until new cohorts for 2025/26 added
+  #filter(vacc_occurence_time<"2025-04-01") %>% #temp end point until new cohorts for 2025/26 added
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   filter(age_at_vacc < 65 & !is.na(vacc_phase)) %>%
   left_join(pneum_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
