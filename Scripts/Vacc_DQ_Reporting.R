@@ -935,11 +935,13 @@ cov_ageDQ <- CovVaxData %>%
            reporting_location_type!="CARE HOME CODE" &
            vacc_location_derived_location_type!="Home for the Elderly" &
            vacc_location_derived_location_type!="Private Nursing Home, Private Hospital etc" &
-           !grepl("care",vacc_location_name) &
-           !grepl("Care",vacc_location_name) &
-           !grepl("CARE",vacc_location_name) &
-           !grepl("Nursing",vacc_location_name) )  %>%
-  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+           !grepl("Care Home",vacc_location_name) &
+           !grepl("CARE HOME",vacc_location_name) &
+           !grepl("Carehome",vacc_location_name) &
+           !grepl("Nursing Home",vacc_location_name) &
+           !grepl("Residential",vacc_location_name) &
+           !grepl("Residents",vacc_location_name)) %>% 
+left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
   filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
            patient_date_of_birth>as.Date("2024-09-30")) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
