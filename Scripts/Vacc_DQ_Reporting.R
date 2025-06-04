@@ -2206,8 +2206,8 @@ table(rsv_cohort$cohort, useNA = "ifany")
 table(rsv_cohort$cohort_reporting_label, useNA = "ifany")
 table(rsv_cohort$cohort_description, useNA = "ifany")
 table(rsv_cohort$cohort_target_diseases, useNA = "ifany")
-table(rsv_cohort$patient_cohort_created_at, useNA = "ifany")
-table(rsv_cohort$patient_cohort_updated_at, useNA = "ifany")
+# table(rsv_cohort$patient_cohort_created_at, useNA = "ifany")
+# table(rsv_cohort$patient_cohort_updated_at, useNA = "ifany")
 table(rsv_cohort$cohort_phase, useNA = "ifany")
 
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
@@ -2246,8 +2246,11 @@ rsv_vacc <- rsv_vacc %>%
 
 rsv_vacc$vacc_phase <- NA
 rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
-                             as.Date("2024-08-01"),as.Date("2025-07-31"))] <-
+                             as.Date("2024-08-01"),as.Date("2025-05-31"))] <-
   "Aug24_Jul25"
+rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
+                             as.Date("2025-06-01"),as.Date("2026-05-31"))] <-
+  "Aug25_Jul26"
 
 
 ### CREATE RSV VACCINATIONS DQ QUERIES
@@ -2401,9 +2404,16 @@ rsv_boosterSumm <- rsv_booster %>%
 ### THAT ARE NOT IN AGE-RELATED ELIGIBILITY COHORT
 
 # patients not aged 74-79 on 1st Aug 2024 and vaccinated 2024-25
-rsv_non_cohort <- rsv_vacc %>%
+rsv_non_cohort2425 <- rsv_vacc %>%
   filter(vacc_phase=="Aug24_Jul25" &
-           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31"))) %>% 
+           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31")))
+
+# patients not aged 74-79 on 1st Aug 2025 and vaccinated 2025-26
+rsv_non_cohort2526 <- rsv_vacc %>%
+  filter(vacc_phase=="Aug25_Jul26" &
+           !between(patient_date_of_birth,as.Date("1945-08-02"),as.Date("1951-07-31")))
+
+rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526) %>% 
   left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
   filter(vacc_event_created_at >= reporting_start_date &
            is.na(cohort)) %>%  
@@ -2415,8 +2425,10 @@ rsv_non_cohortSumm <- rsv_non_cohort %>%
   summarise(record_count = n())
 
 rsv_non_cohort <- rsv_non_cohort %>%
-  filter(age_at_vacc>55) %>% 
+  filter(age_at_vacc>55 | patient_sex=="MALE") %>% 
   select(-c(Date_Administered,cohort:cohort_target_diseases))
+
+rm(rsv_non_cohort2425,rsv_non_cohort2526)
 
 ### CREATE & SAVE OUT RSV VACC SUMMARY REPORT
 #############################################################################################
