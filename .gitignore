@@ -3,6 +3,8 @@
 .RData
 .Ruserdata
 
-# data folders #
-# Outputs/
+# ignore all .xlsx files in the Outputs/DQ HB Reports directory and any of its subdirectories
+Outputs/DQ HB Reports/**/*.xlsx
 
+# ignore all .rds files in the Outputs/Temp directory
+Outputs/Temp/*.rds
