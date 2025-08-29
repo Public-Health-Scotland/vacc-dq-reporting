@@ -1134,6 +1134,9 @@ FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2023-09-01") &
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2024-09-01") &
                          FluVaxData$vacc_occurence_time<as.Date("2025-04-01")] <-
   "Autumn Winter 2024_25"
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2025-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2026-04-01")] <-
+  "Autumn Winter 2025_26"
 
 table(FluVaxData$vacc_phase,useNA = "ifany")
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2021-04-01") &
