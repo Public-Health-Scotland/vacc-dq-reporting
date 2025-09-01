@@ -1074,15 +1074,22 @@ flu_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                           from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort_target_diseases like '%Influenza%' ")
 
+table(flu_cohort$cohort_target_diseases,useNA = "ifany")
 table(flu_cohort$cohort_description,useNA = "ifany")
 table(flu_cohort$cohort_phase,useNA = "ifany")
 table(flu_cohort$cohort [is.na(flu_cohort$cohort_phase)])
 
+flu_cohort <- flu_cohort %>% filter(!grepl("Spring", cohort_phase))
+
 flu_cohort$cohort_phase [flu_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
-flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2023_24"] <-
+flu_cohort$cohort_phase [flu_cohort$cohort_phase==c("Autumn Winter 23_24")] <-
   "Autumn Winter 2023_24"
-flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2024_25"] <-
+flu_cohort$cohort_phase [flu_cohort$cohort %in% c("NHS_STAFF","NHS_STAFF_2") &
+                           is.na(flu_cohort$cohort_phase)] <-
+  "Autumn Winter 2024_25"
+flu_cohort$cohort_phase [flu_cohort$cohort_phase %in%
+                           c("Imported from NCDS","July_24","September 2023")] <-
   "Autumn Winter 2024_25"
 
 table(flu_cohort$cohort_phase,useNA = "ifany")
@@ -1135,7 +1142,7 @@ FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2024-09-01") &
                          FluVaxData$vacc_occurence_time<as.Date("2025-04-01")] <-
   "Autumn Winter 2024_25"
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2025-09-01") &
-                         FluVaxData$vacc_occurence_time<as.Date("2026-04-01")] <-
+                         FluVaxData$vacc_occurence_time<as.Date("2026-03-29")] <-
   "Autumn Winter 2025_26"
 
 table(FluVaxData$vacc_phase,useNA = "ifany")
