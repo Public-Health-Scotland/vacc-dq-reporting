@@ -1,0 +1,18 @@
+[1] "Start time:  2025-09-03 12:57:32.136123"
+[1] "End time:  2025-09-03 12:58:01.138474"
+Time difference of 29 secs
+
+     AGE_75_79_RSV AGE_TURNING_75_RSV 
+            499092             107555 
+
+Age 75 RSV - turning 75 primary cohort              Age 75 to 79 RSV catch up 
+                                107555                                 499092 
+
+Scottish Immunisation Programme 
+                         606647 
+
+55735004 - Respiratory syncytial virus infection (disorder) 
+                                                     606647 
+
+Aug24_Jul25 Aug25_Jul26 
+     298889      307758 

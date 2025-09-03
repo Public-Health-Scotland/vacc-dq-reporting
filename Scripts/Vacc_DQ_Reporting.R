@@ -60,7 +60,13 @@
 #   Section G:  update Query Count spreadsheet to compare query figures with 
 #               previous run's figures.
 
+# Save console outputs to Scripts folder
+console <- file("Scripts/DQ console output.txt")
+sink(console)
+sink(file = console, type = "message")
+
 start.time <- Sys.time()
+print(paste("Start time: ", start.time))
 
 ########################################################################
 ###############################  SECTION A #############################
@@ -2749,12 +2755,13 @@ write.xlsx(df2,
 rm(df,df2,query_count)
 
 end.time <- Sys.time()
+print(paste("End time: ", end.time))
 
 time.taken <- round(end.time - start.time,2)
 
 time.taken
 
-
+sink(NULL)
 
 ############# END OF SCRIPT ###########################
 
