@@ -60,7 +60,13 @@
 #   Section G:  update Query Count spreadsheet to compare query figures with 
 #               previous run's figures.
 
+# Save console outputs to Scripts folder
+console <- file("Scripts/DQ console output.txt")
+sink(console)
+sink(file = console, type = "message")
+
 start.time <- Sys.time()
+print(paste("Start time: ", start.time))
 
 ########################################################################
 ###############################  SECTION A #############################
@@ -1086,15 +1092,22 @@ flu_cohort <- odbc::dbGetQuery(conn, "select source_system_patient_id,
                           from vaccination.vaccination_patient_cohort_analysis_audit
             where cohort_target_diseases like '%Influenza%' ")
 
+table(flu_cohort$cohort_target_diseases,useNA = "ifany")
 table(flu_cohort$cohort_description,useNA = "ifany")
 table(flu_cohort$cohort_phase,useNA = "ifany")
 table(flu_cohort$cohort [is.na(flu_cohort$cohort_phase)])
 
+flu_cohort <- flu_cohort %>% filter(!grepl("Spring", cohort_phase))
+
 flu_cohort$cohort_phase [flu_cohort$cohort=="NHS_STAFF_2022"] <-
   "Autumn Winter 2022_23"
-flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2023_24"] <-
+flu_cohort$cohort_phase [flu_cohort$cohort_phase==c("Autumn Winter 23_24")] <-
   "Autumn Winter 2023_24"
-flu_cohort$cohort_phase [flu_cohort$cohort_description=="Autumn Winter 2024_25"] <-
+flu_cohort$cohort_phase [flu_cohort$cohort %in% c("NHS_STAFF","NHS_STAFF_2") &
+                           is.na(flu_cohort$cohort_phase)] <-
+  "Autumn Winter 2024_25"
+flu_cohort$cohort_phase [flu_cohort$cohort_phase %in%
+                           c("Imported from NCDS","July_24","September 2023")] <-
   "Autumn Winter 2024_25"
 
 table(flu_cohort$cohort_phase,useNA = "ifany")
@@ -1146,6 +1159,9 @@ FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2023-09-01") &
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2024-09-01") &
                          FluVaxData$vacc_occurence_time<as.Date("2025-04-01")] <-
   "Autumn Winter 2024_25"
+FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2025-09-01") &
+                         FluVaxData$vacc_occurence_time<as.Date("2026-03-29")] <-
+  "Autumn Winter 2025_26"
 
 table(FluVaxData$vacc_phase,useNA = "ifany")
 FluVaxData$vacc_phase [FluVaxData$vacc_occurence_time>=as.Date("2021-04-01") &
@@ -2415,15 +2431,15 @@ rsv_boosterSumm <- rsv_booster %>%
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
 ### THAT ARE NOT IN AGE-RELATED ELIGIBILITY COHORT
 
-# patients not aged 74-79 on 1st Aug 2024 and vaccinated 2024-25
+# patients vaccinated 2024-25 and not aged 74 on 31/07/2024 or aged 75-79 on 01/08/2024
 rsv_non_cohort2425 <- rsv_vacc %>%
   filter(vacc_phase=="Aug24_Jul25" &
            !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31")))
 
-# patients not aged 74-79 on 1st Aug 2025 and vaccinated 2025-26
+# patients vaccinated 2025-26 and not aged 74 on 31/07/2025 or eligible in previous year
 rsv_non_cohort2526 <- rsv_vacc %>%
   filter(vacc_phase=="Aug25_Jul26" &
-           !between(patient_date_of_birth,as.Date("1945-08-02"),as.Date("1951-07-31")))
+           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1951-07-31")))
 
 rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526) %>% 
   left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
@@ -2808,11 +2824,16 @@ if (answer == 1) {
 }
 
 
-
-
-rm(df, df2, query_count)
-
 end.time <- Sys.time()
+print(paste("End time: ", end.time))
+
+
+
+
+
+
+sink(NULL)
+
 
 time.taken <- round(end.time - start.time, 2)
 
