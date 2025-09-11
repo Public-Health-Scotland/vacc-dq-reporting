@@ -89,6 +89,18 @@ library(readxl)
 # library(phsmethods)
 # library(svDialogs)
 
+### LOAD PACKAGES FOR SENSITIVITY LABELS ### 
+library(openxlsx2) #install openxlsx2 to set Sensitivity Labels on HB outputs. 
+
+# Install remotes if not already installed
+if (!requireNamespace("remotes", quietly = TRUE)) {
+  install.packages("remotes")
+}
+
+# Install phssensitivitylabels from GitHub
+remotes::install_github("Moohan/phssensitivitylabels")
+library(phssensitivitylabels)
+
 ### ESTABLISH ODBC CONNECTION TO DVPROD MANUALLY
 conn <- odbc::dbConnect(odbc::odbc(),
                   dsn = "DVPROD", 
@@ -2705,39 +2717,90 @@ for(i in 1:16) {
     insertImage(HBReportWB,sheet = 1,file = "Scripts/Vacc HB DQ Summary.jpg",
                   width = 10,height = 11,startRow = (nrow(df_summ) + 3),startCol = 1, units = "in",dpi = 300)
 
-    saveWorkbook(HBReportWB,paste("Outputs/DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
+  
+     saveWorkbook(HBReportWB,paste("Outputs/DQ HB Reports/",hb_cypher[i],"_Vacc_DQ_Report_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep=""))
     
-    rm(HBReport,HBReportWB)
+    #rm(HBReport,HBReportWB)
   } else {
     writexl::write_xlsx(df_summ,paste("Outputs/DQ HB Reports/",hb_cypher[i],"_NULL_",format(as.Date(Sys.Date()),"%Y-%m-%d"),".xlsx",sep = ""))
   }
 }
+
+
+### ADD SENSITIVITY LABELS ###
+
+for(i in seq_along(hb_cypher)) {
+  # File paths (incl NULL files)
+  HBReportWB <- paste0("Outputs/DQ HB Reports/", hb_cypher[i], "_Vacc_DQ_Report_", format(as.Date(Sys.Date()),"%Y-%m-%d"), ".xlsx", sep = "")
+  HBReportWB_NULL <- paste0("Outputs/DQ HB Reports/", hb_cypher[i], "_NULL_", format(as.Date(Sys.Date()),"%Y-%m-%d"), ".xlsx", sep = "")
   
+  # Check if the file exists and apply label to HBReportWB files
+  if (file.exists(HBReportWB)) {
+    # Apply the sensitivity label
+    apply_sensitivity_label(HBReportWB, "OFFICIAL_SENSITIVE_VMO")
+    cat("Applied label to:", HBReportWB, "\n")
+  } else {
+    warning("File not found: ", HBReportWB)
+  } 
+  
+  # Check if the NULL files exists and apply label to HBReportWB_NULL files
+  if (file.exists(HBReportWB_NULL)) {
+    # Apply the sensitivity label
+    apply_sensitivity_label(HBReportWB_NULL, "OFFICIAL_SENSITIVE_VMO")
+    cat("Applied label to:", HBReportWB_NULL, "\n")
+  } else {
+    warning("File not found: ", HBReportWB_NULL)
+  }
+}
+
 
 ########################################################################
 ################################ SECTION G #############################
 ##########################  QUERY COUNT SUMMARY ########################
 ########################################################################
 
-# read in latest query_count output and save as backup
-temp_query_count <- readxl::read_excel("Outputs/DQ Report Query count.xlsx")
+#### Read in the appropriate Excel file based on 4 week or historic report
+if (answer == 1) {
+  temp_query_count <- readxl::read_excel("Outputs/DQ Report Query count.xlsx")
+} else {
+  temp_query_count_historical <- readxl::read_excel("Outputs/DQ Report Query count - full hist.xlsx")
+}
 
-write.xlsx(temp_query_count,
-           paste("Outputs/Archive/DQ Report Query count_backup.xlsx"),
-           asTable = TRUE,
-           colWidths = "auto")
+
+#### Now backup the appropriate data
+if (answer == 1) {
+  openxlsx::write.xlsx(temp_query_count,
+                       paste0("Outputs/Archive/DQ Report Query count_backup.xlsx"),
+                       asTable = TRUE,
+                       colWidths = "auto")
+} else {
+  openxlsx::write.xlsx(temp_query_count_historical,
+                       paste0("Outputs/Archive/DQ Report Query count - full hist_backup.xlsx"),
+                       asTable = TRUE,
+                       colWidths = "auto")
+}
+
 
 ### CREATE SUMMARY TABLE OF ALL QUERIES PRODUCED IN LATEST RUN
+
 query_count <- all_queries %>% group_by(QueryName) %>% 
   summarise("record_count_latest_run"=n()) %>% 
   mutate(date_latest_run = Sys.Date()) %>% 
   select(QueryName,date_latest_run,record_count_latest_run)
 
+
 ### READ IN AND UPDATE QUERY COUNT FROM PREVIOUS RUN
-df <- temp_query_count %>% 
-  select(-date_previous_run,-record_count_previous_run) %>% 
-  rename("date_previous_run" = date_latest_run) %>% 
-  rename("record_count_previous_run" = record_count_latest_run)
+if (answer == 1) {
+  df <- temp_query_count %>% 
+    select(-date_previous_run, -record_count_previous_run) %>% 
+    rename("date_previous_run" = date_latest_run) %>% 
+    rename("record_count_previous_run" = record_count_latest_run)
+} else {
+  df <- temp_query_count_historical %>% 
+    select(-date_previous_run, -record_count_previous_run) %>% 
+    rename("date_previous_run" = date_latest_run) %>% 
+    rename("record_count_previous_run" = record_count_latest_run)
+}
 
 # join figures for latest and previous DQ reports for comparison
 df2 <- query_count %>% full_join(df, by="QueryName") %>% 
@@ -2747,22 +2810,33 @@ df2$date_latest_run <- as.Date(df2$date_latest_run,"%Y-%m-%d")
 df2$date_previous_run <- as.Date(df2$date_previous_run,"%Y-%m-%d")
 
 # Save out collated tables into an excel file
-write.xlsx(df2,
-           paste("Outputs/DQ Report Query count.xlsx"),
-           asTable = TRUE,
-           colWidths = "auto")
 
-rm(df,df2,query_count)
+if (answer == 1) {
+  openxlsx::write.xlsx(df2,
+                       paste0("Outputs/DQ Report Query count.xlsx"),
+                       asTable = TRUE,
+                       colWidths = "auto")
+} else {
+  openxlsx::write.xlsx(df2,
+                       paste0("Outputs/DQ Report Query count - full hist.xlsx"),
+                       asTable = TRUE,
+                       colWidths = "auto")
+}
+
 
 end.time <- Sys.time()
 print(paste("End time: ", end.time))
 
-time.taken <- round(end.time - start.time,2)
 
-time.taken
+
+
+
 
 sink(NULL)
 
+
+time.taken <- round(end.time - start.time, 2)
+
+time.taken
+
 ############# END OF SCRIPT ###########################
-
-
