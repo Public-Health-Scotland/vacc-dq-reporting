@@ -1523,6 +1523,8 @@ hz_cohort$cohort_phase [is.na(hz_cohort$cohort_target_diseases) &
 hz_cohort$cohort_phase [hz_cohort$cohort_phase=="Scottish Immunisation Programme"] <-
   "Sept22_Aug23"
 
+table(hz_cohort$cohort_phase, useNA = "ifany")
+
 ### CREATE NEW COLUMN FOR DAYS BETWEEN VACCINATION AND RECORD CREATION
 HZVaxData$vacc_record_date <- as.Date(substr(HZVaxData$vacc_record_created_at,1,10))
 HZVaxData$days_between_vacc_and_recording <- as.double(difftime(HZVaxData$vacc_record_date,HZVaxData$vacc_occurence_time,units="days"))
@@ -1570,6 +1572,9 @@ HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
 HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
                               as.Date("2024-09-01"),as.Date("2025-08-31"))] <-
   "Sept24_Aug25"
+HZVaxData$vacc_phase [between(HZVaxData$vacc_occurence_time,
+                              as.Date("2025-09-01"),as.Date("2026-08-31"))] <-
+  "Sept25_Aug26"
 
 table(HZVaxData$vacc_phase, useNA = "ifany")
 
@@ -1855,44 +1860,64 @@ hz_zostavax_error <- hz_zostavax_error %>% select(-Date_Administered)
 ### CREATE TABLE OF RECORDS & SUMMARY OF VACC GIVEN OUTWITH AGE GUIDELINES
 ### THAT ARE NOT IN SIS ELIGIBILITY COHORT
 
-# patients not aged 70-79 on 1st Sep 2021 and vaccinated 2021-22
-hz_ageDQ1 <- HZVaxData %>% 
-  filter(vacc_phase=="Sept21_Aug22" &
-           !between(patient_date_of_birth,as.Date("1941-09-02"),as.Date("1951-09-01")))         
+# patients not aged 70-79 on 1st Sep 2021, up to the age of 80 at vacc,
+# and vaccinated 2021-22
+hz_ageDQ_2122 <- HZVaxData %>%
+  filter(vacc_phase=="Sept21_Aug22") %>% 
+  mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2021-09-01"))))) %>% 
+  filter(!age_at_01sep %in% c(70:79) & age_at_vacc<80)
 
-# patients not aged 70-79 on 1st Sep 2022 and vaccinated 2022-23
-hz_ageDQ2 <- HZVaxData %>%
-  filter(vacc_phase=="Sept22_Aug23" &
-           !between(patient_date_of_birth,as.Date("1942-09-02"),as.Date("1952-09-01")))
+# patients not aged 70-79 on 1st Sep 2022,, up to the age of 80 at vacc,
+# and vaccinated 2022-23
+hz_ageDQ_2223 <- HZVaxData %>%
+  filter(vacc_phase=="Sept22_Aug23") %>% 
+  mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2022-09-01"))))) %>% 
+  filter(!age_at_01sep %in% c(70:79) & age_at_vacc<80)
 
-# patients not aged 65 or 70-79 on 1st Sep 2023 and vaccinated 2023-24
-hz_ageDQ3 <- HZVaxData %>%
-  filter(vacc_phase=="Sept23_Aug24" &
-           !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
-           !between(patient_date_of_birth,as.Date("1943-09-02"),as.Date("1953-09-01")))         
+# patients not aged 65 or 70-79 on 1st Sep 2023, up to the age of 80 at vacc,
+# and vaccinated 2023-24
+hz_ageDQ_2324 <- HZVaxData %>%
+  filter(vacc_phase=="Sept23_Aug24") %>% 
+  mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2023-09-01"))))) %>% 
+  filter(!age_at_01sep %in% c(65,70:79) & age_at_vacc<80)
 
-# patients not aged 65,66 or 70-79 on 1st Sep 2024 and vaccinated 2024-25
-hz_ageDQ4 <- HZVaxData %>%
-  filter(vacc_phase=="Sept24_Aug25" &
-           !between(patient_date_of_birth,as.Date("1958-09-02"),as.Date("1959-09-01")) &
-           !between(patient_date_of_birth,as.Date("1957-09-02"),as.Date("1958-09-01")) &
-           !between(patient_date_of_birth,as.Date("1944-09-02"),as.Date("1954-09-01")))         
+# patients not aged 65,66 or 70-79 on 1st Sep 2024, up to the age of 80 at vacc,
+# and vaccinated 2024-25
+hz_ageDQ_2425 <- HZVaxData %>%
+  filter(vacc_phase=="Sept24_Aug25") %>% 
+  mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
+                                        end = as.Date("2024-09-01"))))) %>% 
+  filter(!age_at_01sep %in% c(65:66,70:79) & age_at_vacc<80)
 
-# combine 4 ageDQ dfs and remove anyone in eligibility cohorts
-hz_ageDQ <- rbind(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3,hz_ageDQ4) %>%
+# patients not aged 65-67 or 70-79 on 1st Sep 2025, up to the age of 80 at vacc,
+# and vaccinated 2025-26
+hz_ageDQ_2526 <- HZVaxData %>%
+  filter(vacc_phase=="Sept25_Aug26") %>%
+  mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
+                                        end = as.Date("2025-09-01"))))) %>% 
+  filter(!age_at_01sep %in% c(65:67,70:79) & age_at_vacc<80)
+
+# combine yearly ageDQ dfs and remove anyone in eligibility cohorts
+hz_ageDQ <- rbind(hz_ageDQ_2122,hz_ageDQ_2223,hz_ageDQ_2324,
+                  hz_ageDQ_2425,hz_ageDQ_2526) %>%
   left_join(hz_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
   filter(vacc_event_created_at >= reporting_start_date &
            is.na(cohort)) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "20. HZ Vacc given outwith age guidance") 
 
-rm(hz_ageDQ1,hz_ageDQ2,hz_ageDQ3,hz_ageDQ4)
+rm(hz_ageDQ_2122,hz_ageDQ_2223,hz_ageDQ_2324,
+   hz_ageDQ_2425,hz_ageDQ_2526)
 
 hz_ageDQSumm <- hz_ageDQ %>%
-  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, Date_Administered, age_at_vacc) %>%
+  group_by(vacc_location_health_board_name,vacc_location_name,vacc_data_source,
+           Date_Administered,age_at_vacc,age_at_01sep) %>%
   summarise(record_count = n())
 
-hz_ageDQ <- hz_ageDQ %>% select(-c(Date_Administered,cohort:cohort_target_diseases))
+hz_ageDQ <- hz_ageDQ %>% select(-c(Date_Administered,age_at_01sep:cohort_target_diseases))
 
 ### CREATE & SAVE OUT SHINGLES VACC SUMMARY REPORT
 #############################################################################################
