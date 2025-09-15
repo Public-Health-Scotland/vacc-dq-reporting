@@ -83,7 +83,7 @@ library(dplyr)
 library(openxlsx)
 library(readxl)
 # library(writexl)
-# library(lubridate)
+library(lubridate)
 # library(textclean)
 # library(odbc)
 # library(phsmethods)
@@ -1866,7 +1866,7 @@ hz_ageDQ_2122 <- HZVaxData %>%
   filter(vacc_phase=="Sept21_Aug22") %>% 
   mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
                                                 end = as.Date("2021-09-01"))))) %>% 
-  filter(!age_at_01sep %in% c(70:79) & age_at_vacc<80)
+  filter(!(age_at_01sep %in% c(70:79) & age_at_vacc<80))
 
 # patients not aged 70-79 on 1st Sep 2022,, up to the age of 80 at vacc,
 # and vaccinated 2022-23
@@ -1874,7 +1874,7 @@ hz_ageDQ_2223 <- HZVaxData %>%
   filter(vacc_phase=="Sept22_Aug23") %>% 
   mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
                                                 end = as.Date("2022-09-01"))))) %>% 
-  filter(!age_at_01sep %in% c(70:79) & age_at_vacc<80)
+  filter(!(age_at_01sep %in% c(70:79) & age_at_vacc<80))
 
 # patients not aged 65 or 70-79 on 1st Sep 2023, up to the age of 80 at vacc,
 # and vaccinated 2023-24
@@ -1882,7 +1882,7 @@ hz_ageDQ_2324 <- HZVaxData %>%
   filter(vacc_phase=="Sept23_Aug24") %>% 
   mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
                                                 end = as.Date("2023-09-01"))))) %>% 
-  filter(!age_at_01sep %in% c(65,70:79) & age_at_vacc<80)
+  filter(!(age_at_01sep %in% c(65,70:79) & age_at_vacc<80))
 
 # patients not aged 65,66 or 70-79 on 1st Sep 2024, up to the age of 80 at vacc,
 # and vaccinated 2024-25
@@ -1890,7 +1890,7 @@ hz_ageDQ_2425 <- HZVaxData %>%
   filter(vacc_phase=="Sept24_Aug25") %>% 
   mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
                                         end = as.Date("2024-09-01"))))) %>% 
-  filter(!age_at_01sep %in% c(65:66,70:79) & age_at_vacc<80)
+  filter(!(age_at_01sep %in% c(65:66,70:79) & age_at_vacc<80))
 
 # patients not aged 65-67 or 70-79 on 1st Sep 2025, up to the age of 80 at vacc,
 # and vaccinated 2025-26
@@ -1898,7 +1898,7 @@ hz_ageDQ_2526 <- HZVaxData %>%
   filter(vacc_phase=="Sept25_Aug26") %>%
   mutate(age_at_01sep = year(as.period(interval(start = patient_date_of_birth,
                                         end = as.Date("2025-09-01"))))) %>% 
-  filter(!age_at_01sep %in% c(65:67,70:79) & age_at_vacc<80)
+  filter(!(age_at_01sep %in% c(65:67,70:79) & age_at_vacc<80))
 
 # combine yearly ageDQ dfs and remove anyone in eligibility cohorts
 hz_ageDQ <- rbind(hz_ageDQ_2122,hz_ageDQ_2223,hz_ageDQ_2324,
