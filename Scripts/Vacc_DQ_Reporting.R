@@ -2458,13 +2458,22 @@ rsv_boosterSumm <- rsv_booster %>%
 
 # patients vaccinated 2024-25 and not aged 74 on 31/07/2024 or aged 75-79 on 01/08/2024
 rsv_non_cohort2425 <- rsv_vacc %>%
-  filter(vacc_phase=="Aug24_Jul25" &
-           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1950-07-31")))
+  filter(vacc_phase=="Aug24_Jul25") %>% 
+  mutate(age_at_31Jul = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2024-07-31"))))) %>% 
+  mutate(age_at_01Aug = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2024-08-01"))))) %>% 
+  filter(!(age_at_01Aug %in% c(75:79)) & !(age_at_31Jul==74))
 
 # patients vaccinated 2025-26 and not aged 74 on 31/07/2025 or eligible in previous year
 rsv_non_cohort2526 <- rsv_vacc %>%
-  filter(vacc_phase=="Aug25_Jul26" &
-           !between(patient_date_of_birth,as.Date("1944-08-02"),as.Date("1951-07-31")))
+  filter(vacc_phase=="Aug25_Jul26") %>% 
+  mutate(age_at_31Jul = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2025-07-31"))))) %>% 
+  mutate(age_at_01Aug = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2025-08-01"))))) %>% 
+  filter(!(age_at_01Aug %in% c(76:80)) & !(age_at_31Jul %in% c(74:75)))
+
 
 rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526) %>% 
   left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
