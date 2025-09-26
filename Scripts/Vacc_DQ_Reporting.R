@@ -2488,7 +2488,8 @@ rsv_non_cohortSumm <- rsv_non_cohort %>%
 
 rsv_non_cohort <- rsv_non_cohort %>%
   filter(age_at_vacc>55 | patient_sex=="MALE") %>% 
-  select(-c(Date_Administered,cohort:cohort_target_diseases))
+  select(-c(Date_Administered,cohort:cohort_target_diseases,age_at_31Jul,
+            age_at_01Aug))
 
 rm(rsv_non_cohort2425,rsv_non_cohort2526)
 
