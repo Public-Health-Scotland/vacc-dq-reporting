@@ -2539,6 +2539,11 @@ rm(rsv_chi_inv,rsv_dose1x2,rsv_booster,rsv_non_cohort)
 
 gc()
 
+saveRDS(multi_vacc,"Outputs/Temp/multi_vacc.rds")
+# multi_vacc <- readRDS("Outputs/Temp/multi_vacc.rds")
+saveRDS(rsv_vacc,"Outputs/Temp/rsv_vacc.rds")
+# rsv_vacc <- readRDS("Outputs/Temp/rsv_vacc.rds")
+
 ########################################################################
 ############################### SECTION E ##############################
 ########  UNIQUE DQ IDS, SORT & ORDER DATA, ALL QUERIES TABLE ##########
