@@ -428,6 +428,9 @@ CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2024-09-23") &
 CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-03-31") &
                          CovVaxData$vacc_occurence_time<as.Date("2025-07-01")] <-
   "Spring 2025"
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-09-29") &
+                         CovVaxData$vacc_occurence_time<as.Date("2026-02-01")] <-
+  "Autumn Winter 2025_26"
 
 table(CovVaxData$vacc_phase,useNA = "ifany")
 
@@ -946,9 +949,23 @@ cov_outwith_progSumm <- cov_outwith_prog %>%
 ### THAT ARE NOT IN SIS ELIGIBILITY COHORT OR IN A CARE HOME
 # ONLY ON DATA FROM SPRING 2025 PROG ONWARDS
 
-# patients aged <75 on 30th Jun 2025 and non-cohort, or <6months on 31st March 2025,
+# patients aged <75 on 30th Jun 2025 or <6months on 31st March 2025
 # and vaccinated Spring 2025
-cov_ageDQ <- CovVaxData %>% 
+cov_ageDQ_spr25 <- CovVaxData %>% 
+  filter(vacc_phase == "Spring 2025") %>% 
+  mutate(age_at_30jun = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2025-06-30"))))) %>% 
+  filter(age_at_30jun<75 | patient_date_of_birth>as.Date("2024-09-30"))
+  
+# patients aged <75 on 31st Mar 2026 or <6months on 1st Sept 2025
+# and vaccinated A/W 2025/26
+cov_ageDQ_aw2526 <- CovVaxData %>% 
+  filter(vacc_phase == "Autumn Winter 2025_26") %>% 
+  mutate(age_at_31mar = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2026-03-31"))))) %>% 
+  filter(age_at_31mar<75 | patient_date_of_birth>as.Date("2025-03-01"))
+
+cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526) %>% 
   filter(vacc_occurence_time>=as.Date("2025-03-31") &
            reporting_location_type!="CARE HOME CODE" &
            vacc_location_derived_location_type!="Home for the Elderly" &
@@ -960,17 +977,17 @@ cov_ageDQ <- CovVaxData %>%
            !grepl("Residential",vacc_location_name) &
            !grepl("Residents",vacc_location_name)) %>% 
 left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
-  filter(patient_date_of_birth>as.Date("1950-06-30") & is.na(cohort) |
-           patient_date_of_birth>as.Date("2024-09-30")) %>% 
+  filter(is.na(cohort)) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>% 
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "27. COV Vacc given outwith age guidance") 
 
 cov_ageDQSumm <- cov_ageDQ %>%
-  group_by(vacc_location_health_board_name, vacc_location_name, vacc_data_source, age_at_vacc) %>%
+  group_by(vacc_location_health_board_name,vacc_location_name,vacc_data_source,
+           vacc_phase,age_at_vacc,age_at_30jun,age_at_31mar) %>%
   summarise(record_count = n())
 
-cov_ageDQ <- cov_ageDQ %>% select(-c(cohort:cohort_target_diseases))
+cov_ageDQ <- cov_ageDQ %>% select(-c(age_at_30jun:cohort_target_diseases))
 
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
