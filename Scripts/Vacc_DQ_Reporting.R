@@ -976,9 +976,11 @@ cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526) %>%
            !grepl("Nursing Home",vacc_location_name) &
            !grepl("Residential",vacc_location_name) &
            !grepl("Residents",vacc_location_name)) %>% 
-left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
-  filter(is.na(cohort)) %>% 
-  filter(vacc_event_created_at >= reporting_start_date) %>% 
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(is.na(cohort) |
+           (cohort %in% c("NHS_STAFF", "NHS_STAFF_2", "AGE_65_AND_OVER") &
+              vacc_phase == "Autumn Winter 2025_26")) %>% 
+  filter(vacc_event_created_at >= reporting_start_date) %>%
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "27. COV Vacc given outwith age guidance") 
 
