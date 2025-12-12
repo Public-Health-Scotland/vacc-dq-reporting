@@ -950,13 +950,36 @@ cov_outwith_progSumm <- cov_outwith_prog %>%
 # ONLY ON DATA FROM SPRING 2025 PROG ONWARDS
 
 # patients aged <75 on 30th Jun 2025 or <6months on 31st March 2025
-# and vaccinated Spring 2025
+# and vaccinated Spring 2025 and not in any eligibility cohort
 cov_ageDQ_spr25 <- CovVaxData %>% 
   filter(vacc_phase == "Spring 2025") %>% 
   mutate(age_at_30jun = year(as.period(interval(start = patient_date_of_birth,
                                                 end = as.Date("2025-06-30"))))) %>% 
-  filter(age_at_30jun<75 | patient_date_of_birth>as.Date("2024-09-30"))
-  
+  filter(age_at_30jun<75 | patient_date_of_birth>as.Date("2024-09-30")) %>% 
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
+  filter(is.na(cohort)) 
+
+table(cov_ageDQ_spr25$cohort,useNA = "ifany")
+
+# create list of patients in cohorts eligible for AW25/26
+cov_cohort_aw2526 <- cov_cohort %>%
+  filter(cohort_phase=="Autumn Winter 2025_26" &
+           cohort %in% c("AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING",
+                         "AGE_75_AND_OVER",
+                         "OLDER_PEOPLE_CARE_HOME"))
+
+# patients aged <75 on 31st Mar 2026 or <6months on 1st Sept 2025
+# and vaccinated A/W 2025/26 and not in eligible cohort (as created above)
+cov_ageDQ_aw2526 <- CovVaxData %>% 
+  filter(vacc_phase == "Autumn Winter 2025_26") %>% 
+  mutate(age_at_31mar = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2026-03-31"))))) %>% 
+  filter(age_at_31mar<75 | patient_date_of_birth>as.Date("2025-03-01")) %>% 
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(!source_system_patient_id %in% cov_cohort_aw2526$source_system_patient_id)
+
+table(cov_ageDQ_aw2526$cohort,useNA = "ifany")
+
 # patients aged <75 on 31st Mar 2026 or <6months on 1st Sept 2025
 # and vaccinated A/W 2025/26
 cov_ageDQ_aw2526 <- CovVaxData %>% 
@@ -965,6 +988,8 @@ cov_ageDQ_aw2526 <- CovVaxData %>%
                                                 end = as.Date("2026-03-31"))))) %>% 
   filter(age_at_31mar<75 | patient_date_of_birth>as.Date("2025-03-01"))
 
+# combine data from all campaigns and additionally remove vacc in care home 
+# locations that have been missed from CH cohort
 cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526) %>% 
   filter(vacc_occurence_time>=as.Date("2025-03-31") &
            reporting_location_type!="CARE HOME CODE" &
@@ -976,20 +1001,16 @@ cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526) %>%
            !grepl("Nursing Home",vacc_location_name) &
            !grepl("Residential",vacc_location_name) &
            !grepl("Residents",vacc_location_name)) %>% 
-  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>%
-  filter(is.na(cohort) |
-           (cohort %in% c("NHS_STAFF", "NHS_STAFF_2", "AGE_65_AND_OVER") &
-              vacc_phase == "Autumn Winter 2025_26")) %>% 
   filter(vacc_event_created_at >= reporting_start_date) %>%
   mutate(sort_date = vacc_event_created_at) %>% 
   mutate(QueryName = "27. COV Vacc given outwith age guidance") 
 
 cov_ageDQSumm <- cov_ageDQ %>%
   group_by(vacc_location_health_board_name,vacc_location_name,vacc_data_source,
-           vacc_phase,age_at_vacc,age_at_30jun,age_at_31mar) %>%
+           vacc_phase,age_at_vacc,age_at_30jun,age_at_31mar,cohort) %>%
   summarise(record_count = n())
 
-cov_ageDQ <- cov_ageDQ %>% select(-c(age_at_30jun:cohort_target_diseases))
+cov_ageDQ <- cov_ageDQ %>% select(-c(age_at_30jun:age_at_31mar))
 
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
