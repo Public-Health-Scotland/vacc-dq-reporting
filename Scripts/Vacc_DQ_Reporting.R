@@ -1026,6 +1026,7 @@ cov_ageDQSumm <- cov_ageDQ %>%
 
 cov_ageDQ <- cov_ageDQ %>% select(-c(age_at_30jun:age_at_31mar))
 
+rm(cov_ageDQ_spr25,cov_ageDQ_aw2526,cov_ageDQ_spr26)
 
 ### CREATE & SAVE OUT COVID-19 VACC SUMMARY REPORT
 #############################################################################################
