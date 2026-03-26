@@ -2281,6 +2281,8 @@ rsv_vacc <- odbc::dbGetQuery(conn, "select
                         vacc_occurence_time,
                         vacc_location_health_board_name,
                         vacc_location_name,
+                        reporting_location_type,
+                        vacc_location_derived_location_type,
                         vacc_product_name, 
                         vacc_batch_number, 
                         vacc_performer_name,
@@ -2357,9 +2359,13 @@ rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
                              as.Date("2024-08-01"),as.Date("2025-05-31"))] <-
   "Aug24_Jul25"
 rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
-                             as.Date("2025-06-01"),as.Date("2026-05-31"))] <-
+                             as.Date("2025-06-01"),as.Date("2026-03-31"))] <-
   "Aug25_Jul26"
+rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
+                             as.Date("2026-04-01"),as.Date("2026-03-31"))] <-
+  "Aug26_Jul27"
 
+table(rsv_vacc$vacc_phase,useNA = "ifany")
 
 ### CREATE RSV VACCINATIONS DQ QUERIES
 #############################################################################################
@@ -2413,7 +2419,8 @@ rsv_chi_invSumm <- rsv_chi_inv %>%
            vacc_data_source,CHIcheck,Date_Administered) %>%
   summarise(record_count = n())
 
-rsv_chi_inv <- rsv_chi_inv %>% select(-Date_Administered,-CHIcheck)
+rsv_chi_inv <- rsv_chi_inv %>% select(-c(Date_Administered,CHIcheck,
+                  reporting_location_type,vacc_location_derived_location_type))
 
 rsv_vacc <- rsv_vacc %>% select(-CHIcheck)
 
@@ -2493,7 +2500,9 @@ rsv_dose1x2Summ <- rsv_dose1x2 %>%
   group_by(vacc_location_health_board_name, vacc_data_source, Date_Administered) %>%
   summarise(record_count = n())
 
-rsv_dose1x2 <- rsv_dose1x2 %>% select(-Date_Administered)
+rsv_dose1x2 <- rsv_dose1x2 %>%
+  select(-c(Date_Administered,reporting_location_type,
+         vacc_location_derived_location_type))
 
 ### CREATE SUMMARY TABLE OF BOOSTER DOSES
 rsv_booster <- rsv_vacc %>% 
@@ -2526,11 +2535,31 @@ rsv_non_cohort2526 <- rsv_vacc %>%
   mutate(age_at_31Jul = year(as.period(interval(start = patient_date_of_birth, 
                                                 end = as.Date("2025-07-31"))))) %>% 
   mutate(age_at_01Aug = year(as.period(interval(start = patient_date_of_birth, 
-                                                end = as.Date("2025-08-01"))))) %>% 
-  filter(!(age_at_01Aug %in% c(76:80)) & !(age_at_31Jul %in% c(74:75)))
+                                                end = as.Date("2024-08-01"))))) %>% 
+  filter(!(age_at_01Aug %in% c(75:79)) & !(age_at_31Jul %in% c(74:75)))
 
+# patients vaccinated 2026-27 and not aged 74 on 31/07/2026, or aged 80+ on 01/04/2026,
+# or in a care home for older adults or eligible in previous years
+rsv_non_cohort2627 <- rsv_vacc %>%
+  filter(vacc_phase=="Aug26_Jul27") %>% 
+  mutate(age_at_31Jul = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2026-07-31"))))) %>% 
+  mutate(age_at_01Aug = year(as.period(interval(start = patient_date_of_birth, 
+                                                end = as.Date("2024-08-01"))))) %>% 
+  filter(!(age_at_01Aug %in% c(75:79)) & !(age_at_31Jul %in% c(74:76))
+         & !patient_date_of_birth<"1946-04-01") %>% 
+  filter(reporting_location_type!="CARE HOME CODE" &
+           vacc_location_derived_location_type!="Home for the Elderly" &
+           vacc_location_derived_location_type!="Private Nursing Home, Private Hospital etc" &
+           !grepl("Care Home",vacc_location_name) &
+           !grepl("CARE HOME",vacc_location_name) &
+           !grepl("Carehome",vacc_location_name) &
+           !grepl("Nursing Home",vacc_location_name) &
+           !grepl("Residential",vacc_location_name) &
+           !grepl("Residents",vacc_location_name))
 
-rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526) %>% 
+rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526,
+                        rsv_non_cohort2627) %>% 
   left_join(rsv_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
   filter(vacc_event_created_at >= reporting_start_date &
            is.na(cohort)) %>%  
@@ -2546,7 +2575,7 @@ rsv_non_cohort <- rsv_non_cohort %>%
   select(-c(Date_Administered,cohort:cohort_target_diseases,age_at_31Jul,
             age_at_01Aug))
 
-rm(rsv_non_cohort2425,rsv_non_cohort2526)
+rm(rsv_non_cohort2425,rsv_non_cohort2526,rsv_non_cohort2627)
 
 ### CREATE & SAVE OUT RSV VACC SUMMARY REPORT
 #############################################################################################
@@ -2588,7 +2617,9 @@ rm(rsv_summary_report)
 #############################################################################################
 
 multi_vacc <- multi_vacc %>% rbind(rsv_chi_inv,rsv_dose1x2)
-rsv_vacc <- rbind(rsv_booster,rsv_non_cohort)
+rsv_vacc <- rbind(rsv_booster,rsv_non_cohort) %>% 
+  select(-c(reporting_location_type,vacc_location_derived_location_type))
+
 
 rm(rsv_chi_inv,rsv_dose1x2,rsv_booster,rsv_non_cohort)
 
