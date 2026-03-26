@@ -431,6 +431,9 @@ CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-03-31") &
 CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-09-29") &
                          CovVaxData$vacc_occurence_time<as.Date("2026-02-01")] <-
   "Autumn Winter 2025_26"
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2026-03-31") &
+                         CovVaxData$vacc_occurence_time<as.Date("2026-07-01")] <-
+  "Spring 2026"
 
 table(CovVaxData$vacc_phase,useNA = "ifany")
 
@@ -980,17 +983,28 @@ cov_ageDQ_aw2526 <- CovVaxData %>%
 
 table(cov_ageDQ_aw2526$cohort,useNA = "ifany")
 
-# patients aged <75 on 31st Mar 2026 or <6months on 1st Sept 2025
-# and vaccinated A/W 2025/26
-cov_ageDQ_aw2526 <- CovVaxData %>% 
-  filter(vacc_phase == "Autumn Winter 2025_26") %>% 
-  mutate(age_at_31mar = year(as.period(interval(start = patient_date_of_birth,
-                                                end = as.Date("2026-03-31"))))) %>% 
-  filter(age_at_31mar<75 | patient_date_of_birth>as.Date("2025-03-01"))
+# create list of patients in cohorts eligible for Spring 26
+cov_cohort_spr26 <- cov_cohort %>%
+  filter(cohort_phase=="Spring 2026" &
+           cohort %in% c("AGE_6_MONTHS_AND_OVER_WEAKENED_IMMUNE_SYSTEM_REPORTING",
+                         "AGE_75_AND_OVER",
+                         "OLDER_PEOPLE_CARE_HOME"))
+
+# patients aged <75 on 30th Jun 2026 or <6months on 1st Apr 2026
+# and vaccinated Spring 26 and not in eligible cohort (as created above)
+cov_ageDQ_spr26 <- CovVaxData %>% 
+  filter(vacc_phase == "Spring 2026") %>% 
+  mutate(age_at_30jun = year(as.period(interval(start = patient_date_of_birth,
+                                                end = as.Date("2026-06-30"))))) %>% 
+  filter(age_at_30jun<75 | patient_date_of_birth>as.Date("2025-10-01")) %>% 
+  left_join(cov_cohort, by=(c("source_system_patient_id","vacc_phase"="cohort_phase"))) %>% 
+  filter(!source_system_patient_id %in% cov_cohort_spr26$source_system_patient_id)
+
+table(cov_ageDQ_spr26$cohort,useNA = "ifany")
 
 # combine data from all campaigns and additionally remove vacc in care home 
 # locations that have been missed from CH cohort
-cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526) %>% 
+cov_ageDQ <- bind_rows(cov_ageDQ_spr25,cov_ageDQ_aw2526,cov_ageDQ_spr26) %>% 
   filter(vacc_occurence_time>=as.Date("2025-03-31") &
            reporting_location_type!="CARE HOME CODE" &
            vacc_location_derived_location_type!="Home for the Elderly" &
