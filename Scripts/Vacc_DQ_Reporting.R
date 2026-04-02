@@ -2362,7 +2362,7 @@ rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
                              as.Date("2025-06-01"),as.Date("2026-03-31"))] <-
   "Aug25_Jul26"
 rsv_vacc$vacc_phase [between(rsv_vacc$vacc_occurence_time,
-                             as.Date("2026-04-01"),as.Date("2026-03-31"))] <-
+                             as.Date("2026-04-01"),as.Date("2027-03-31"))] <-
   "Aug26_Jul27"
 
 table(rsv_vacc$vacc_phase,useNA = "ifany")
@@ -2567,7 +2567,7 @@ rsv_non_cohort <- rbind(rsv_non_cohort2425,rsv_non_cohort2526,
   mutate(QueryName = "24. RSV Non-cohort vacc age>55")
 
 rsv_non_cohortSumm <- rsv_non_cohort %>% 
-  group_by(vacc_location_health_board_name, age_at_vacc, patient_sex) %>%
+  group_by(vacc_location_health_board_name, age_at_vacc, patient_sex, vacc_phase) %>%
   summarise(record_count = n())
 
 rsv_non_cohort <- rsv_non_cohort %>%
