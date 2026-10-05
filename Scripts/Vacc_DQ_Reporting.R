@@ -434,6 +434,9 @@ CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2025-09-29") &
 CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2026-03-31") &
                          CovVaxData$vacc_occurence_time<as.Date("2026-07-01")] <-
   "Spring 2026"
+CovVaxData$vacc_phase [CovVaxData$vacc_occurence_time>=as.Date("2026-10-05") &
+                         CovVaxData$vacc_occurence_time<as.Date("2027-02-01")] <-
+  "Autumn Winter 2026_7"
 
 table(CovVaxData$vacc_phase,useNA = "ifany")
 
